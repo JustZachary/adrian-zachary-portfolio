@@ -480,7 +480,7 @@ export default function Home() {
               </div>
 
               {/* Right Screenshot */}
-              <div className="lg:sticky lg:top-24">
+              <div className="order-first lg:order-last">
                 <img
                   src="/ai-recruitment.png"
                   alt="AI Recruitment"
@@ -489,7 +489,7 @@ export default function Home() {
               </div>
 
             </div>
-            
+
           </div>
 
         </div>
