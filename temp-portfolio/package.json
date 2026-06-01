@@ -9,12 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@tsparticles/slim": "^4.1.1",
     "framer-motion": "^12.40.0",
     "next": "^16.2.6",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6",
-    "react-tsparticles": "^2.12.2",
-    "tsparticles": "^4.1.1"
+    "react-dom": "^19.2.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
