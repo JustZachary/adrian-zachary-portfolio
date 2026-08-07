@@ -442,7 +442,7 @@ export default function Home() {
           </motion.div>
 
           <motion.p className="font-crimson text-xl md:text-2xl text-[var(--text-dim)] max-w-2xl mx-auto leading-relaxed mb-10 italic" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-            Final-year Software Engineering student forging practical web systems, AI-assisted workflows, and modern digital solutions with real-world impact.
+            Software Engineering graduate forging practical web systems, AI-assisted workflows, and modern digital solutions with real-world impact.
           </motion.p>
 
           <motion.div className="flex gap-4 flex-wrap justify-center mb-14" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}>
