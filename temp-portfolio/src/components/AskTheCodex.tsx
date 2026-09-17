@@ -21,6 +21,7 @@ export default function AskTheCodex() {
   const [said, setSaid] = useState<Said[]>([{ from: "me", text: GREETING.say }]);
   const [chips, setChips] = useState<string[]>(GREETING.then || []);
   const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
   const lastId = useRef<string>("greeting");
   /* What has already been answered, so "what else have you built" can
      move on instead of repeating itself. */
@@ -44,15 +45,47 @@ export default function AskTheCodex() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  function send(question: string) {
+  /* Ask the server first — it has the same retrieval PLUS, if a key is
+     configured, a model to phrase the answer. If it is slow, down, or
+     was never configured, the identical retrieval runs here in the
+     browser and the visitor sees an answer either way. A portfolio that
+     shows an error because a free tier ran out is worse than one that
+     never had a model. */
+  async function send(question: string) {
     const asked = question.trim();
-    if (!asked) return;
-    const reply = answer(asked, DATA, { lastId: lastId.current, seen: seen.current });
-    lastId.current = reply.id;
-    if (reply.id && seen.current.indexOf(reply.id) < 0) seen.current.push(reply.id);
-    setSaid((before) => [...before, { from: "them", text: asked }, { from: "me", text: reply.text }]);
-    setChips(reply.chips || []);
+    if (!asked || busy) return;
+    const local = answer(asked, DATA, { lastId: lastId.current, seen: seen.current });
+
+    setSaid((before) => [...before, { from: "them", text: asked }]);
     setTyped("");
+    setChips([]);
+    setBusy(true);
+
+    let reply = local;
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          question: asked,
+          lastId: lastId.current,
+          seen: seen.current,
+          history: said.slice(-4).map((s) => ({ role: s.from === "them" ? "user" : "assistant", content: s.text })),
+        }),
+      });
+      if (response.ok) {
+        const json = await response.json();
+        if (json && typeof json.text === "string" && json.text.trim()) reply = json;
+      }
+    } catch {
+      /* Offline, blocked, or the route is not deployed — `local` stands. */
+    }
+
+    lastId.current = reply.id || local.id;
+    if (reply.id && seen.current.indexOf(reply.id) < 0) seen.current.push(reply.id);
+    setSaid((before) => [...before, { from: "me", text: reply.text }]);
+    setChips(reply.chips || local.chips || []);
+    setBusy(false);
   }
 
   return (
@@ -108,6 +141,11 @@ export default function AskTheCodex() {
                 </span>
               </div>
             ))}
+            {busy && (
+              <p className="font-crimson text-xs italic" style={{ color: "rgba(246,188,124,0.5)" }}>
+                consulting the codex…
+              </p>
+            )}
             <div ref={foot} />
           </div>
 
@@ -135,13 +173,15 @@ export default function AskTheCodex() {
               ref={field}
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
-              placeholder="Ask about the work…"
+              placeholder={busy ? "…" : "Ask about the work…"}
+              disabled={busy}
               aria-label="Your question"
               className="flex-1 bg-transparent font-crimson text-sm px-2 py-2 outline-none"
               style={{ color: "rgba(217,234,250,0.9)", border: "1px solid rgba(246,188,124,0.2)", borderRadius: "2px" }}
             />
             <button
               type="submit"
+              disabled={busy}
               className="font-cinzel text-[10px] tracking-widest px-4 py-2"
               style={{ background: "rgba(246,188,124,0.14)", border: "1px solid rgba(246,188,124,0.4)", color: "#F6BC7C", borderRadius: "2px" }}
             >

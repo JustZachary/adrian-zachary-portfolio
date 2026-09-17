@@ -80,3 +80,30 @@ came before them.
 It is not a model and does not pretend to be. It forgives one typo,
 answers two questions in one message, and when it half-recognises
 something it asks instead of guessing.
+
+### Giving it a model (optional)
+
+`src/app/api/chat/route.ts` will use a language model IF one is
+configured, and works exactly as before if one is not. Retrieval still
+decides what is true; the model only chooses the words, and gets the
+retrieved text as its entire context.
+
+In Vercel's environment variables:
+
+    CHAT_API_KEY   the provider key
+    CHAT_API_URL   optional — any OpenAI-shaped endpoint (Groq, Gemini's
+                   compatible endpoint, OpenRouter, Cloudflare)
+    CHAT_MODEL     optional
+
+**Set a spend cap with the provider.** A public chat box is a public
+invoice. The rate limit in the route slows a bored visitor; the cap is
+what stops a determined one.
+
+Three things happen before anything reaches the model, all in
+`src/lib/chatapi.js` and all tested in `chatapi.test.js`: the question
+is length-capped, the caller is rate-limited, and the context is the
+retrieved answer only. One thing happens after: if the reply contains
+names that appear nowhere in the context, it is thrown away and the
+retrieved answer is sent instead. Worse prose, still true.
+
+    node src/lib/chatapi.test.js
