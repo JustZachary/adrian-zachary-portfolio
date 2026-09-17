@@ -22,10 +22,14 @@ import { NextResponse } from "next/server";
 import { answer } from "../../../lib/answer.js";
 import { PROJECTS } from "../../../data/projects";
 import { TOOLS, TOPICS, SMALL_TALK, GREETING, UNKNOWN } from "../../../data/facts.js";
-import { buildMessages, limiter, looksLikeRefusal, providerFrom, tooLong, trustworthy } from "../../../lib/chatapi.js";
+import { buildMessages, buildOpenMessages, limiter, looksLikeRefusal, providerFrom, saysNothingAboutHim, tooLong, trustworthy } from "../../../lib/chatapi.js";
 
 const DATA = { projects: PROJECTS, topics: TOPICS.concat(SMALL_TALK), tools: TOOLS, greeting: GREETING, unknown: UNKNOWN };
 const allowed = limiter(12);
+/* Tighter, because this is the lane a stranger can spend his money in:
+   every question that is not about him is a model call with nothing
+   retrieved to keep it short. */
+const allowedOpen = limiter(5);
 
 type Body = {
   question?: string;
@@ -58,9 +62,44 @@ export async function POST(request: Request) {
      only something to get wrong. They also happen to be the answers a
      bored visitor can generate endlessly, so not spending a call on
      them is the cheap thing as well as the safe one. */
-  const NOT_WORTH_A_MODEL = ["greeting", "thanks", "unknown", "unsure"];
+  const NOT_WORTH_A_MODEL = ["greeting", "thanks"];
+  const NOTHING_RETRIEVED = ["unknown", "unsure"];
+
   if (!provider || NOT_WORTH_A_MODEL.indexOf(found.id) >= 0) {
     return NextResponse.json({ ...found, phrased: false });
+  }
+
+  /* Nothing on the page matched, so the question is probably not about
+     him — "what is Flutter?", "what does a solutions architect do?".
+     The second lane answers those from the model's own knowledge and is
+     forbidden from saying anything about him. If it slips, or the
+     allowance is spent, the honest refusal is still there. */
+  if (NOTHING_RETRIEVED.indexOf(found.id) >= 0) {
+    if (!allowedOpen(who)) return NextResponse.json({ ...found, phrased: false, why: "open lane rate limited" });
+    try {
+      const reply = await fetch(provider.url, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${provider.key}` },
+        body: JSON.stringify({
+          model: provider.model,
+          messages: buildOpenMessages(question, body.history),
+          max_tokens: 200,
+          temperature: 0.5,
+        }),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!reply.ok) throw new Error(`provider said ${reply.status}`);
+      const json = await reply.json();
+      const said = json?.choices?.[0]?.message?.content;
+      if (!saysNothingAboutHim(said)) throw new Error("open answer spoke for him");
+      return NextResponse.json({ ...found, text: String(said).trim(), id: "open", phrased: true, lane: "open" });
+    } catch (err) {
+      return NextResponse.json({
+        ...found,
+        phrased: false,
+        why: err instanceof Error ? err.message : "provider unavailable",
+      });
+    }
   }
 
   try {

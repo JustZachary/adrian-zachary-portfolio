@@ -107,3 +107,26 @@ names that appear nowhere in the context, it is thrown away and the
 retrieved answer is sent instead. Worse prose, still true.
 
     node src/lib/chatapi.test.js
+
+### The two lanes
+
+A question that matches something on the page is answered from the page,
+and a model — if one is configured — only rephrases it. That is the
+grounded lane, and his experience comes from nowhere else.
+
+A question that matches nothing is probably not about him: "what is
+Flutter", "what does a solutions architect do". The open lane answers
+those from the model's own knowledge, under a different brief that
+forbids saying ANYTHING about him — no experience, no skills, no
+availability, no opinions. If an answer in that lane mentions him, or
+makes a first-person claim about work, it is thrown away and the honest
+refusal is sent instead.
+
+The open lane also declines to write documents for people — cover
+letters, essays, homework, long code. Not on principle: each one is a
+stranger writing on his bill, and it has a tighter rate limit than the
+grounded lane for the same reason.
+
+If you add a topic to facts.js, you move a question OUT of the open lane
+and into the grounded one. That is usually the right way to answer
+anything about him that visitors keep asking.

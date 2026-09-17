@@ -111,6 +111,61 @@ export function trustworthy(said, context) {
   return strange.length <= 2;
 }
 
+/* THE SECOND LANE.
+ *
+ * When retrieval finds nothing, the question is usually not about him
+ * at all — "what is Flutter?", "what does a solutions architect
+ * actually do?". Refusing those makes the chat feel like a search box
+ * with a locked drawer, so the model may answer them from its own
+ * knowledge.
+ *
+ * With one hard rule: in this lane it may explain the world, and it may
+ * NOT say anything about him. His experience only ever comes from the
+ * retrieved data. That is the whole reason there are two briefs instead
+ * of one relaxed one.
+ *
+ * And it declines the things a public chat box gets used for — cover
+ * letters, essays, homework, code somebody wants written. Not because
+ * they are wicked, but because each one is a stranger writing on his
+ * bill, and a portfolio is not a free ChatGPT. */
+const OPEN_SYSTEM = [
+  "You are the chat on Adrian Zachary's (Zach's) portfolio site. This question is not about him.",
+  "",
+  "You may answer general questions — technology, tools, the industry, how something works — from your own knowledge, briefly and plainly.",
+  "",
+  "NEVER say anything about Zach: not his experience, his skills, his opinions, his availability, his studies, or what he has used or built. You do not know any of that here. If the question turns to him, say it is better asked about the work on the page and offer that.",
+  "Never write documents for people: no cover letters, essays, homework, assignments, long code, or anything somebody would paste in somewhere else. Say that is not what this is for.",
+  "No medical, legal or financial advice. No opinions on politics or religion. Nothing about other named people.",
+  "",
+  "Two or three sentences. Contractions, no lists, no headings, never the words 'as an AI'.",
+  "It is fine to finish by pointing back at the work on the page.",
+].join("\n");
+
+export function buildOpenMessages(question, history = []) {
+  const recent = (history || [])
+    .slice(-2)
+    .filter((m) => m && (m.role === "user" || m.role === "assistant") && m.content)
+    .map((m) => ({ role: m.role, content: String(m.content).slice(0, 400) }));
+  return [
+    { role: "system", content: OPEN_SYSTEM },
+    ...recent,
+    { role: "user", content: String(question || "").slice(0, MAX_QUESTION) },
+  ];
+}
+
+/* The one thing the open lane must never do. Anything that reads as a
+   claim about his experience is thrown away — the grounded lane is the
+   only place those may come from. */
+export function saysNothingAboutHim(said) {
+  const text = String(said || "");
+  if (!text.trim()) return false;
+  if (text.length > 700) return false;
+  if (/\b(zach|adrian)\b/i.test(text)) return false;
+  if (/\bmy (experience|project|projects|work|degree|studies|internship|cv|resume|skills?|stack)\b/i.test(text)) return false;
+  if (/\bI (built|made|worked|work|studied|study|used|use|have used|led|managed|interned|graduated|designed|developed)\b/i.test(text)) return false;
+  return true;
+}
+
 /* The model refusing, in any of the shapes the brief invites.
  *
  * This matters because a refusal from the MODEL means something

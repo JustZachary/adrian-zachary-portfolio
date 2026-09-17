@@ -7,7 +7,7 @@
  * be redirected by whoever is typing, and cannot put words in Zach's
  * mouth that are not in the retrieved text.
  */
-import { buildMessages, limiter, looksLikeRefusal, providerFrom, tooLong, trustworthy, MAX_QUESTION } from "./chatapi.js";
+import { buildMessages, buildOpenMessages, limiter, looksLikeRefusal, providerFrom, saysNothingAboutHim, tooLong, trustworthy, MAX_QUESTION } from "./chatapi.js";
 
 let pass = 0, fail = 0;
 const check = (n, c) => { c ? pass++ : fail++; console.log((c ? "  ok   " : "  FAIL ") + n); };
@@ -117,6 +117,35 @@ check("a real answer is not mistaken for one",
   !looksLikeRefusal("I built SmartAirIQ with Flutter — I designed the interface and the mobile workflow."));
 check("nor is an answer that merely contains the word know",
   !looksLikeRefusal("The tools I know best are PHP, Laravel and Flutter."));
+
+/* --- the second lane ------------------------------------------------
+
+   Questions that are not about him at all. The model may explain the
+   world; it may not speak for him. Two briefs rather than one relaxed
+   one, because the whole promise of this chat is that his experience
+   only ever comes from the page. */
+const openBrief = buildOpenMessages("what is Flutter?")[0].content;
+check("the open brief allows general answers", /answer general questions/.test(openBrief));
+check("and forbids speaking about him at all", /NEVER say anything about Zach/.test(openBrief));
+check("it refuses to write documents for people",
+  /cover letters, essays, homework/.test(openBrief));
+check("and stays out of advice nobody should take from a portfolio",
+  /No medical, legal or financial advice/.test(openBrief));
+check("it carries less history than the grounded lane",
+  buildOpenMessages("x", Array.from({ length: 10 }, (_, i) => ({ role: "user", content: `q${i}` }))).length <= 4);
+
+check("a general explanation passes",
+  saysNothingAboutHim("Flutter is Google's UI toolkit for building mobile apps from a single codebase — it uses Dart and draws its own widgets."));
+check("so does an honest deflection",
+  saysNothingAboutHim("That is better asked about the work on this page — have a look at the projects."));
+check("but a claim about his experience does not",
+  !saysNothingAboutHim("I built three Flutter apps last year and shipped them to the store."));
+check("nor a claim about his studies",
+  !saysNothingAboutHim("My degree covered distributed systems in the final year."));
+check("nor speaking about him by name",
+  !saysNothingAboutHim("Zach is very experienced with Kubernetes."));
+check("nor an essay", !saysNothingAboutHim("word ".repeat(300)));
+check("and silence is not an answer", !saysNothingAboutHim(""));
 
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);
