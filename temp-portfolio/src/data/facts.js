@@ -43,8 +43,8 @@ export const TOPICS = [
   },
   {
     id: "studies",
-    ask: ["study", "studies", "student", "degree", "university", "graduate", "education", "school", "course"],
-    say: "Software Engineering. Most of what's on this site came out of it — SmartAirIQ was the final-year project, and the recruitment work was the industrial internship at SAINS.",
+    ask: ["study", "studies", "student", "degree", "university", "graduate", "education", "school", "course", "ukm", "universiti", "kebangsaan", "major", "what did you study"],
+    say: "Software Engineering (Information Systems) at UKM — Universiti Kebangsaan Malaysia. Most of what's on this site came out of it: SmartAirIQ was the final-year project, and the recruitment work was the industrial internship at SAINS.",
     then: ["Tell me about SmartAirIQ", "What did you do at SAINS?"],
   },
   {
@@ -66,6 +66,18 @@ export const TOPICS = [
     then: ["Tell me about the recruitment system", "What tech was that in?"],
   },
   {
+    id: "where",
+    ask: ["where are you", "where do you live", "based", "location", "city", "located", "kl", "selangor", "malaysia", "sarawak", "relocate", "remote", "onsite", "office"],
+    say: "I'm from Sibu, Sarawak originally, and I'm in the Klang Valley now — working in Petaling Jaya and staying in Ara Damansara.",
+    then: ["What have you built?", "How do I contact you?"],
+  },
+  {
+    id: "now",
+    ask: ["where do you work", "current job", "currently working", "mfinity", "who do you work for", "your company", "employer", "day job", "working now"],
+    say: "I'm at Mfinity Technologies at the moment, working on internal systems and AI-assisted workflows. The projects on this page are the ones I can show publicly.",
+    then: ["What have you built?", "What are you learning?"],
+  },
+  {
     id: "contact",
     ask: ["contact", "email", "reach", "reach out", "touch", "get in touch", "hire", "hiring",
       "linkedin", "github", "cv", "resume", "talk", "message", "available", "availability",
@@ -75,7 +87,7 @@ export const TOPICS = [
          landed on before these were here. */
       "looking for work", "looking for a job", "open to work", "open to opportunities",
       "position", "vacancy", "employment", "recruiting", "role", "roles", "join"],
-    say: `Email is best: ${FACTS.email}. I'm also on GitHub (JustZachary) and LinkedIn, and my CV is downloadable from the Summon Me section at the bottom of this page. Open to software engineering roles, internships and collaborative projects.`,
+    say: `Email is best: ${FACTS.email}. I'm also on GitHub (JustZachary) and LinkedIn, and my CV is downloadable from the Summon Me section at the bottom of this page. I'm working at Mfinity Technologies at the moment, so it's worth saying what it's about.`,
     then: ["What have you built?", "Where are you based?"],
   },
   {
