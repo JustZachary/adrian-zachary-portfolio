@@ -7,7 +7,7 @@
  * be redirected by whoever is typing, and cannot put words in Zach's
  * mouth that are not in the retrieved text.
  */
-import { buildMessages, limiter, providerFrom, tooLong, trustworthy, MAX_QUESTION } from "./chatapi.js";
+import { buildMessages, limiter, looksLikeRefusal, providerFrom, tooLong, trustworthy, MAX_QUESTION } from "./chatapi.js";
 
 let pass = 0, fail = 0;
 const check = (n, c) => { c ? pass++ : fail++; console.log((c ? "  ok   " : "  FAIL ") + n); };
@@ -101,6 +101,22 @@ check("it is told to sound like a person", /Sound like a person in a chat/.test(
 check("and told not to pretend to be him typing",
   /Never claim to be me typing live/.test(brief) && /small chat on my site/.test(brief));
 check("no 'as an AI'", /never use .*as an AI|Never use headings, bullet points, or the words 'as an AI'/i.test(brief));
+
+/* Only retrieval may say "I don't know".
+ *
+ * Asked "tell me about it" after a bit of small talk, the model was
+ * handed a context that DID match — and apologised anyway, because it
+ * could not see how to use one line about cloud reading. The scripted
+ * refusal came back at the visitor and the conversation stopped dead.
+ * A refusal from the model now means "use the retrieved answer". */
+check("the scripted refusal is recognised",
+  looksLikeRefusal("I don't have that on here — ask me about my projects, the tools I work with, or how to reach me."));
+check("so are its cousins",
+  looksLikeRefusal("I do not know that one.") && looksLikeRefusal("I'm not sure about that."));
+check("a real answer is not mistaken for one",
+  !looksLikeRefusal("I built SmartAirIQ with Flutter — I designed the interface and the mobile workflow."));
+check("nor is an answer that merely contains the word know",
+  !looksLikeRefusal("The tools I know best are PHP, Laravel and Flutter."));
 
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

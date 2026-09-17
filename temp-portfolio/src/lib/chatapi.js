@@ -111,6 +111,19 @@ export function trustworthy(said, context) {
   return strange.length <= 2;
 }
 
+/* The model refusing, in any of the shapes the brief invites.
+ *
+ * This matters because a refusal from the MODEL means something
+ * different from a refusal by retrieval. Retrieval saying "nothing
+ * matched" is the honest answer. The model saying "I don't have that"
+ * while holding a context that clearly matched something means it could
+ * not see how to use what it was given — and in that case the retrieved
+ * sentence is a better answer than the apology. */
+export function looksLikeRefusal(said) {
+  return /^(i (do not|don't) (know|have)|i am not sure|i'm not sure|that('s| is) not (on|something))/i
+    .test(String(said || "").trim());
+}
+
 /* The provider is whatever speaks the OpenAI chat shape — Groq, Gemini's
    compatible endpoint, OpenRouter, Cloudflare, or a paid key. One code
    path, no SDK, no dependency: the site ships with none and this does

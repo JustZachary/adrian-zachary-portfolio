@@ -100,6 +100,9 @@ export const SMALL_TALK = [
     id: "howareyou",
     ask: ["how are you", "how you doing", "how is it going", "you good", "whats up"],
     say: "Doing well — mostly deep in cloud architecture reading at the moment. What can I tell you about the work?",
+    /* "tell me more" after small talk used to fall through to a
+       refusal, which reads as a door closing mid-sentence. */
+    deep: "It's the AWS Solutions Architect certification I'm working towards, so a lot of architecture and deployment reading around it. The projects on here are the practical side of the same thing.",
     then: ["What have you built?", "What are you learning?"],
   },
   {
@@ -112,6 +115,7 @@ export const SMALL_TALK = [
     id: "why",
     ask: ["why software", "why engineering", "what do you enjoy", "what drives you", "passion", "motivation", "enjoy most"],
     say: "The part I like is when a system takes a real workflow problem off somebody's desk — that's why the projects here are monitoring and recruitment rather than demos.",
+    deep: "SmartAirIQ came out of people not being able to see air quality information simply, and the recruitment work was HR teams reading resumes by hand. Both are the same shape of problem: something tedious that a system should be carrying.",
     then: ["What have you built?", "What are you learning?"],
   },
   {

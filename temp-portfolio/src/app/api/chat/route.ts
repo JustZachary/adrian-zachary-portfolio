@@ -22,7 +22,7 @@ import { NextResponse } from "next/server";
 import { answer } from "../../../lib/answer.js";
 import { PROJECTS } from "../../../data/projects";
 import { TOOLS, TOPICS, SMALL_TALK, GREETING, UNKNOWN } from "../../../data/facts.js";
-import { buildMessages, limiter, providerFrom, tooLong, trustworthy } from "../../../lib/chatapi.js";
+import { buildMessages, limiter, looksLikeRefusal, providerFrom, tooLong, trustworthy } from "../../../lib/chatapi.js";
 
 const DATA = { projects: PROJECTS, topics: TOPICS.concat(SMALL_TALK), tools: TOOLS, greeting: GREETING, unknown: UNKNOWN };
 const allowed = limiter(12);
@@ -79,6 +79,10 @@ export async function POST(request: Request) {
     const json = await reply.json();
     const said = json?.choices?.[0]?.message?.content;
     if (!trustworthy(said, found.context || found.text)) throw new Error("answer left the context");
+    /* Retrieval found something; if the model apologises anyway it has
+       failed to use what it was handed, and the retrieved sentence is
+       the better answer. Only retrieval gets to say "I don't know". */
+    if (looksLikeRefusal(said)) throw new Error("model refused an answer retrieval had");
     return NextResponse.json({ ...found, text: String(said).trim(), phrased: true });
   } catch (err) {
     /* Down, out of credit, slow, or off-script: the retrieved answer is
