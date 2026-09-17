@@ -147,5 +147,18 @@ check("nor speaking about him by name",
 check("nor an essay", !saysNothingAboutHim("word ".repeat(300)));
 check("and silence is not an answer", !saysNothingAboutHim(""));
 
+/* Asked whether it had a grandfather, the open lane answered "I don't
+   have a grandfather, as I'm an AI assistant on this portfolio site" —
+   inventing a self to deny having one, in the first person, on a page
+   where the first person means him. It has no self to talk about. */
+check("the open lane is told not to speak as him",
+  /Do NOT answer in the first person as though you were him/.test(openBrief));
+check("and that it is not a character with a life",
+  /You are not a character with a life, a family or a history/.test(openBrief));
+check("and never to call itself an AI assistant",
+  /Never describe yourself as an AI assistant/.test(openBrief));
+check("his private life is out of the open lane too",
+  /his family, his private life/.test(openBrief));
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

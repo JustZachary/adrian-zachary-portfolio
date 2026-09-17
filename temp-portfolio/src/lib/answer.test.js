@@ -32,6 +32,7 @@ const DATA = {
     },
   ],
   topics: [
+    { id: "private", ask: ["grandfather", "family", "married", "his grandfather"], say: "That's outside what this page covers.", then: ["What have you built?"] },
     { id: "howareyou", ask: ["how are you", "how is it going"], say: "Doing well, thanks.", then: [] },
     { id: "contact", ask: ["contact", "email", "hire", "touch", "get in touch"], say: "Email is best: z@example.com.", then: ["What have you built?"] },
     { id: "internship", ask: ["sains", "internship", "work experience"], say: "I interned at SAINS.", then: [] },
@@ -141,6 +142,14 @@ check("and offers the way forward", unsure.chips.length > 0);
 eq("a question of nothing but small words still lands", ask("How are you?").id, "howareyou");
 eq("and so does its cousin", ask("how is it going?").id, "howareyou");
 check("while a real question is unaffected", /SmartAirIQ/.test(ask("tell me about SmartAirIQ").text));
+
+/* A question about his private life that happens to contain his name
+   was reaching the biography, because the name matched and the rest of
+   the question did not. */
+eq("family questions are answered as family questions",
+  ask("how about zachary, do you know his grandfather?").id, "private");
+eq("even without his name in it", ask("are you married?").id, "private");
+check("while the biography still works", /SmartAirIQ|projects|2 projects/.test(ask("who are you?").text) || ask("who are you?").id !== "private");
 
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

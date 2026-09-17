@@ -35,6 +35,19 @@ export const TOOLS = [
    they tend to ask them. `ask` is what a visitor might type — spelling
    variants included on purpose, because that is how people type. */
 export const TOPICS = [
+  /* First in the list on purpose: a question about his private life
+     should be answered by THIS rather than by something that happens to
+     share a word with it. "Do you know his grandfather" contains his
+     name, and without this it reached the biography. */
+  {
+    id: "private",
+    ask: ["grandfather", "grandmother", "family", "parents", "father", "mother", "siblings", "brother", "sister",
+      "wife", "husband", "girlfriend", "boyfriend", "married", "single", "children", "kids", "relationship",
+      "religion", "politics", "age", "old are you", "birthday", "salary", "how much do you earn", "pay",
+      "your family", "his family", "your grandfather", "his grandfather", "personal life", "home address", "where do you stay"],
+    say: "That's outside what this page covers — it's about the work. Happy to talk about the projects, the tools, or how to get in touch.",
+    then: ["What have you built?", "What do you work with?", "How do I contact you?"],
+  },
   {
     id: "who",
     ask: ["who are you", "about", "introduce", "yourself", "bio", "background", "adrian", "zachary", "zach"],
