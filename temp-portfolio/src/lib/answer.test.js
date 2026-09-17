@@ -32,6 +32,7 @@ const DATA = {
     },
   ],
   topics: [
+    { id: "howareyou", ask: ["how are you", "how is it going"], say: "Doing well, thanks.", then: [] },
     { id: "contact", ask: ["contact", "email", "hire", "touch", "get in touch"], say: "Email is best: z@example.com.", then: ["What have you built?"] },
     { id: "internship", ask: ["sains", "internship", "work experience"], say: "I interned at SAINS.", then: [] },
   ],
@@ -132,6 +133,14 @@ check("and they are not run together", both.text.indexOf("\n\n") > 0);
 const unsure = ask("sains?");
 check("one weak signal asks rather than guesses", /Did you mean|SAINS/.test(unsure.text));
 check("and offers the way forward", unsure.chips.length > 0);
+
+/* A phrase made only of small words matched nothing, because matching
+   ran on the question with the small words taken out. "How are you?"
+   came back as "I only know what's on this site", which is the most
+   machine-like thing a chat can say. */
+eq("a question of nothing but small words still lands", ask("How are you?").id, "howareyou");
+eq("and so does its cousin", ask("how is it going?").id, "howareyou");
+check("while a real question is unaffected", /SmartAirIQ/.test(ask("tell me about SmartAirIQ").text));
 
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

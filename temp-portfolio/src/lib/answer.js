@@ -156,7 +156,12 @@ function fieldAsked(asked) {
 const POINTERS = ["it", "that", "this", "they", "them", "one", "there", "its", "theirs"];
 const pointsBack = (raw) => raw.split(" ").some((w) => POINTERS.indexOf(w) >= 0);
 
-function score(asked, entry) {
+/* `asked` is the question with the small words stripped out; `raw` is
+   all of it. Phrases need the raw form — "how are you" is nothing but
+   small words, so against the stripped version it matches nothing at
+   all, which is exactly how a chat ends up answering "how are you?"
+   with "I only know what's on this site". */
+function score(asked, entry, raw = "") {
   const triggers = new Set((entry.ask || []).flatMap((a) => words(a)));
   const phrases = (entry.ask || []).filter((a) => a.indexOf(" ") > 0);
   let points = 0;
@@ -166,8 +171,9 @@ function score(asked, entry) {
   }
   /* A whole phrase matching is worth more than its words: "work
      experience" should reach the internship, not every project. */
+  const whole = normalise(raw) || asked.join(" ");
+  for (const p of phrases) if (whole.indexOf(normalise(p)) >= 0) points += 3;
   const flat = asked.join(" ");
-  for (const p of phrases) if (flat.indexOf(normalise(p)) >= 0) points += 3;
 
   /* People put spaces where a product name has none — "smart air iq",
      "next js", "fire base". Comparing with the spaces taken out costs
@@ -229,7 +235,7 @@ export function answer(question, data = {}, context = {}) {
 
   let best = null, bestPoints = 0;
   for (const entry of entries) {
-    const points = score(asked, entry);
+    const points = score(asked, entry, raw);
     if (points > bestPoints) { best = entry; bestPoints = points; }
   }
 

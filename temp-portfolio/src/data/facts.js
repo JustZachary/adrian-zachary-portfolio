@@ -93,7 +93,7 @@ export const SMALL_TALK = [
   {
     id: "bot",
     ask: ["are you real", "are you a bot", "bot", "ai", "human", "really you", "chatgpt", "robot", "is this you", "automated"],
-    say: "I'm a small chat on Zach's site — not him typing, and not a chatbot with opinions of its own. I can only tell you what's written on this page. For anything else, his email's at the bottom.",
+    say: "Straight answer: this is a small chat on my site, not me typing. It only knows what is written on this page — for anything else, my email is at the bottom.",
     then: ["What have you built?", "How do I contact you?"],
   },
   {
@@ -124,12 +124,12 @@ export const SMALL_TALK = [
 
 /* Said when somebody only says hello. */
 export const GREETING = {
-  say: "Hello — ask me about Zach's projects, the tools he works with, or how to get in touch.",
+  say: "Hello — ask me about my projects, the tools I work with, or how to get in touch.",
   then: ["What have you built?", "What do you work with?", "How do I contact you?"],
 };
 
 /* Said when nothing matches. Never a guess: it says what it does know. */
 export const UNKNOWN = {
-  say: "I only know what's on this site, and that one isn't on it. I can tell you about the projects, the tools behind them, the SAINS internship, or how to get in touch.",
+  say: "I don't have that on here. I can tell you about my projects, the tools behind them, the SAINS internship, or how to reach me.",
   then: ["What have you built?", "What do you work with?", "How do I contact you?"],
 };
