@@ -87,8 +87,29 @@ export const TOPICS = [
          landed on before these were here. */
       "looking for work", "looking for a job", "open to work", "open to opportunities",
       "position", "vacancy", "employment", "recruiting", "role", "roles", "join"],
-    say: `Email is best: ${FACTS.email}. I'm also on GitHub (JustZachary) and LinkedIn, and my CV is downloadable from the Summon Me section at the bottom of this page. I'm working at Mfinity Technologies at the moment, so it's worth saying what it's about.`,
+    say: `Email is best: ${FACTS.email}. I'm also on GitHub (JustZachary) and LinkedIn, and my CV is at the bottom of this page. I'm working at Mfinity Technologies at the moment and still interested in hearing about new opportunities.`,
     then: ["What have you built?", "Where are you based?"],
+  },
+  {
+    id: "languages",
+    ask: ["language", "languages", "speak", "spoken", "english", "malay", "bahasa", "iban", "multilingual", "fluent"],
+    say: "English and Bahasa Malaysia day to day, and Iban — I'm from Sibu, so it's the one I grew up with.",
+    then: ["Where are you based?", "What have you built?"],
+  },
+  {
+    id: "whyyou",
+    ask: ["why you", "why should we hire", "hire you", "what makes you", "stand out", "strength", "strengths", "best at", "good at", "sell yourself", "pitch"],
+    say: "Because the things on this page are systems people actually use, not demos — an enterprise recruitment platform under UAT, an environmental monitoring app, and the internal tooling I build now. I'm comfortable being handed a half-defined problem and coming back with something that works.",
+    /* His honest answer to the question recruiters always ask, and the
+       one the chat had nothing for. Worth rewriting in his own words
+       when he has ten minutes — it is the answer that gets read most. */
+    then: ["What have you built?", "How do you work?", "How do I contact you?"],
+  },
+  {
+    id: "howwork",
+    ask: ["how do you work", "work style", "ship", "process", "approach", "team", "collaborate", "collaboration", "prefer"],
+    say: "I'd rather ship something small that works than plan something big that doesn't, and I'm happy working through the unglamorous parts — UAT issues, API behaviour, the bugs nobody volunteers for. Most of what I've built has been alongside other people rather than alone.",
+    then: ["What have you built?", "Why you?"],
   },
   {
     id: "site",
