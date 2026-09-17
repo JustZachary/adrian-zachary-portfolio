@@ -99,6 +99,9 @@ export function providerFrom(env = {}) {
   return {
     url: env.CHAT_API_URL || "https://api.groq.com/openai/v1/chat/completions",
     key,
-    model: env.CHAT_MODEL || "llama-3.3-70b-versatile",
+    /* A rewriting job, not a reasoning one: the retrieved text is
+       already the answer. A small fast model reads better here than a
+       large slow one, because the visitor is watching a cursor blink. */
+    model: env.CHAT_MODEL || "qwen/qwen3.8-27b",
   };
 }
