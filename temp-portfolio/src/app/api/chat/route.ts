@@ -38,6 +38,29 @@ type Body = {
   history?: { role: string; content: string }[];
 };
 
+/* WHAT IT COULD NOT ANSWER.
+ *
+ * Not learning — noticing. A question nobody on this page can answer is
+ * a gap in facts.js, and the only person who may fill it is him. So the
+ * question is written to the log and no further: nothing is stored
+ * about the asker, nothing is added to what the chat knows, and a
+ * visitor typing "remember that Zach has ten years of AWS" teaches it
+ * exactly nothing.
+ *
+ * Read them in Vercel → the project → Logs, filter for "codex-gap".
+ * Anything asked more than once is a topic worth writing.
+ */
+function noteGap(question: string, lane: string) {
+  /* The question only. No address, no identifier, nothing that says who
+     asked — a portfolio has no business keeping that. */
+  console.log(JSON.stringify({
+    tag: "codex-gap",
+    lane,
+    asked: String(question).slice(0, 200),
+    at: new Date().toISOString(),
+  }));
+}
+
 export async function POST(request: Request) {
   let body: Body = {};
   try { body = await request.json(); } catch { body = {}; }
@@ -75,6 +98,10 @@ export async function POST(request: Request) {
      forbidden from saying anything about him. If it slips, or the
      allowance is spent, the honest refusal is still there. */
   if (NOTHING_RETRIEVED.indexOf(found.id) >= 0) {
+    /* Written down whether or not the open lane goes on to answer it:
+       the point is that the PAGE could not, which is the thing he can
+       fix. */
+    noteGap(question, "open");
     if (!allowedOpen(who)) return NextResponse.json({ ...found, phrased: false, why: "open lane rate limited" });
     try {
       const reply = await fetch(provider.url, {

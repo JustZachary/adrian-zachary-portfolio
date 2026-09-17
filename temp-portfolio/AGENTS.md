@@ -130,3 +130,25 @@ grounded lane for the same reason.
 If you add a topic to facts.js, you move a question OUT of the open lane
 and into the grounded one. That is usually the right way to answer
 anything about him that visitors keep asking.
+
+### What it could not answer
+
+The chat does not learn from visitors, and that is deliberate: letting
+the input box write to `facts.js` would let a stranger decide what this
+site says about him, which is the one thing every other guard here
+exists to prevent. "Remember that Zach has ten years of AWS" must teach
+it nothing.
+
+What it does instead is write down the questions the PAGE could not
+answer, as a line in the server log tagged `codex-gap` — the question
+text only, nothing about who asked. Vercel → the project → Logs, filter
+for `codex-gap`.
+
+Anything asked more than once is a topic worth writing in
+`src/data/facts.js`. That is the learning loop: visitors show where the
+gaps are, he decides what goes in, and nothing reaches the site that he
+did not write.
+
+An agent can help with the first half — reading the log, grouping the
+questions, drafting topics — and must never do the second half without
+him. A drafted answer is a suggestion until he has read it.
