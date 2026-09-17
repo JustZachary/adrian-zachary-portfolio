@@ -81,5 +81,18 @@ check("but an invented employer still fails",
 check("and an invented stack still fails",
   !trustworthy("It ran on Kubernetes with Terraform, PostgreSQL and a Kafka queue.", FULL));
 
+/* The brief is the voice, not a note about the person. Written in the
+   third person it produced a site where Zach called himself "he". */
+const brief = buildMessages("q", CONTEXT)[0].content;
+check("the brief speaks as him", /You are Adrian Zachary/.test(brief));
+check("and says so about pronouns", /Always write as I and my/.test(brief));
+check("its refusal is in the first person too",
+  /ask me about my projects/.test(brief) && !/ask about his projects/.test(brief));
+/* The only line allowed to contain "he" or "his" is the one banning
+   them. Anything else is the wording the model will copy. */
+const instructions = brief.replace(/CONTEXT:[\s\S]*$/, "").split("\n").filter((l) => !/Never say/.test(l));
+check("nothing else refers to him in the third person",
+  !instructions.some((l) => /\b(his|he|him)\b/.test(l)));
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

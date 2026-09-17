@@ -53,7 +53,13 @@ export async function POST(request: Request) {
      presentation. */
   const found = answer(question, DATA, { lastId: body.lastId, seen: body.seen || [] });
   const provider = providerFrom(process.env);
-  if (!provider || found.id === "greeting" || found.id === "thanks") {
+  /* Greetings, thanks and refusals are already written, already in the
+     right voice, and there is nothing for a model to add to them —
+     only something to get wrong. They also happen to be the answers a
+     bored visitor can generate endlessly, so not spending a call on
+     them is the cheap thing as well as the safe one. */
+  const NOT_WORTH_A_MODEL = ["greeting", "thanks", "unknown", "unsure"];
+  if (!provider || NOT_WORTH_A_MODEL.indexOf(found.id) >= 0) {
     return NextResponse.json({ ...found, phrased: false });
   }
 

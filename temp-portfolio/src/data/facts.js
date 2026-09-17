@@ -67,7 +67,14 @@ export const TOPICS = [
   },
   {
     id: "contact",
-    ask: ["contact", "email", "reach", "reach out", "touch", "get in touch", "hire", "hiring", "linkedin", "github", "cv", "resume", "talk", "message", "available", "availability", "opportunity", "opportunities", "freelance", "connect"],
+    ask: ["contact", "email", "reach", "reach out", "touch", "get in touch", "hire", "hiring",
+      "linkedin", "github", "cv", "resume", "talk", "message", "available", "availability",
+      "opportunity", "opportunities", "freelance", "connect",
+      /* "are you looking for work" is a question about availability, not
+         about the work already done — and the second reading is what it
+         landed on before these were here. */
+      "looking for work", "looking for a job", "open to work", "open to opportunities",
+      "position", "vacancy", "employment", "recruiting", "role", "roles", "join"],
     say: `Email is best: ${FACTS.email}. I'm also on GitHub (JustZachary) and LinkedIn, and my CV is downloadable from the Summon Me section at the bottom of this page. Open to software engineering roles, internships and collaborative projects.`,
     then: ["What have you built?", "Where are you based?"],
   },
