@@ -47,6 +47,11 @@ const MORE = ["more", "elaborate", "continue", "go on", "details", "detail", "ex
 
 const has = (list, w) => list.indexOf(w) >= 0;
 
+const pick = (project, what) => {
+  const note = (project.notes || []).find((n) => what.test(n.title));
+  return note ? note.body : "";
+};
+
 /* Every project becomes something askable, without anybody writing the
    triggers out: its name, its slug, and every technology on it. */
 function fromProjects(projects) {
@@ -60,6 +65,14 @@ function fromProjects(projects) {
       (p.tech || []).length ? `Built with ${p.tech.join(", ")}.` : "",
     ].filter(Boolean).join(" "),
     deep: (p.notes || []).map((n) => `${n.title}: ${n.body}`).join("\n\n"),
+    title: p.title,
+    fields: {
+      problem: pick(p, /problem/i),
+      solution: pick(p, /solution/i),
+      contribution: pick(p, /contribution/i),
+      outcome: pick(p, /outcome/i),
+      tech: (p.tech || []).length ? `${p.title} was built with ${p.tech.join(", ")}.` : "",
+    },
     then: ["What else have you built?", "What do you work with?", "How do I contact you?"],
   }));
 }
@@ -90,11 +103,58 @@ function toolsEntry(tools) {
   };
 }
 
+/* One typo, forgiven. "flutterr", "recruitmnt", "smartairq" — people
+   type quickly on a phone and a chat that answers "I don't know" to a
+   misspelling reads as broken rather than careful. Only for words long
+   enough that a near miss is unlikely to be a different word. */
+function near(a, b) {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  if (a.length < 5) return false;
+  let i = 0, j = 0, slips = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i += 1; j += 1; continue; }
+    slips += 1;
+    if (slips > 1) return false;
+    if (a.length > b.length) i += 1;
+    else if (b.length > a.length) j += 1;
+    else { i += 1; j += 1; }
+  }
+  return slips + (a.length - i) + (b.length - j) <= 1;
+}
+
+/* What somebody is asking ABOUT a thing, once the thing is established:
+   "what was the problem", "what did you actually do", "what's it built
+   with". Asked on their own these are meaningless — they only mean
+   something attached to the last project talked about. */
+const FIELDS = [
+  { key: "problem", ask: ["problem", "issue", "pain", "need", "gap"] },
+  { key: "solution", ask: ["solution", "solve", "solved", "approach", "fix", "built"] },
+  { key: "contribution", ask: ["contribution", "contribute", "role", "part", "responsible", "did", "doing", "job", "yours"] },
+  { key: "outcome", ask: ["outcome", "result", "results", "impact", "achieved", "difference"] },
+  { key: "tech", ask: ["tech", "stack", "technology", "technologies", "framework", "language", "languages", "written", "made"] },
+];
+
+function fieldAsked(asked) {
+  for (const f of FIELDS) {
+    for (const w of asked) if (f.ask.indexOf(w) >= 0) return f.key;
+  }
+  return null;
+}
+
+/* "it", "that one", "this" — a question with no subject of its own is a
+   question about whatever was last said. */
+const POINTERS = ["it", "that", "this", "they", "them", "one", "there", "its", "theirs"];
+const pointsBack = (raw) => raw.split(" ").some((w) => POINTERS.indexOf(w) >= 0);
+
 function score(asked, entry) {
   const triggers = new Set((entry.ask || []).flatMap((a) => words(a)));
   const phrases = (entry.ask || []).filter((a) => a.indexOf(" ") > 0);
   let points = 0;
-  for (const w of asked) if (triggers.has(w)) points += 2;
+  for (const w of asked) {
+    if (triggers.has(w)) { points += 2; continue; }
+    for (const t of triggers) if (near(w, t)) { points += 1; break; }
+  }
   /* A whole phrase matching is worth more than its words: "work
      experience" should reach the internship, not every project. */
   const flat = asked.join(" ");
@@ -164,10 +224,88 @@ export function answer(question, data = {}, context = {}) {
     if (points > bestPoints) { best = entry; bestPoints = points; }
   }
 
+  const last = context.lastId ? entries.find((e) => e.id === context.lastId) : null;
+  const seen = context.seen || [];
+  const field = fieldAsked(asked);
+
+  /* "what else have you built" — the answer is a project they have not
+     been told about yet, not the same one again. */
+  if (/\b(else|other|another|next)\b/.test(raw)) {
+    const rest = entries.filter((e) => e.kind === "project" && seen.indexOf(e.id) < 0 && e.id !== context.lastId);
+    if (rest.length) {
+      return { text: rest[0].say, chips: onward(rest[0].then, data), id: rest[0].id };
+    }
+    if (projects.length) {
+      return {
+        text: `That is everything on here — ${projects.map((p) => p.title).join(" and ")}. There is more in the CV, and the rest is best over a call.`,
+        chips: ["How do I contact you?"], id: "projects",
+      };
+    }
+  }
+
+  /* A question about PART of a project: the problem, what he actually
+     did, what it was built with. Either the project is named in the
+     question, or it is the one already being talked about — which is
+     what makes "and what tech did it use?" a sentence at all. */
+  const subject = best && best.kind === "project" && bestPoints >= 2
+    ? best
+    : (last && last.kind === "project" ? last : null);
+  if (field && subject && subject.fields && subject.fields[field]) {
+    const others = FIELDS.map((f) => f.key).filter((k) => k !== field && subject.fields[k]);
+    return {
+      text: subject.fields[field],
+      chips: others.slice(0, 2).map((k) => `${k === "tech" ? "What was it built with" : `What was the ${k}`}?`).concat("What else have you built?"),
+      id: subject.id,
+    };
+  }
+
+  /* "what about it", "who was that for" — a question with no subject of
+     its own belongs to whatever was last said. */
+  if (bestPoints < 2 && pointsBack(raw) && last) {
+    return { text: last.deep || last.say, chips: onward(last.then, data), id: last.id };
+  }
+
+  /* Two questions in one message. People do this constantly and a chat
+     that answers only the first half feels like it is not listening. */
+  if (!context.nosplit) {
+    const halves = String(question).split(/\?|\band\b|,/).map((h) => h.trim()).filter((h) => words(h).length >= 1);
+    if (halves.length > 1) {
+      const replies = halves.map((h) => answer(h, data, Object.assign({}, context, { nosplit: true })));
+      const useful = replies.filter((r) => r.id !== "unknown" && r.id !== "greeting" && r.id !== "thanks");
+      const distinct = useful.filter((r, i) => useful.findIndex((o) => o.id === r.id) === i);
+      if (distinct.length > 1) {
+        return {
+          text: distinct.map((r) => r.text).join("\n\n"),
+          chips: distinct[distinct.length - 1].chips || [],
+          id: distinct[distinct.length - 1].id,
+        };
+      }
+    }
+  }
+
   /* Two points is one trigger word. Below that it is a coincidence, and
-     a confident wrong answer is worse than an honest miss. */
+     a confident wrong answer is worse than an honest miss — but one
+     point is close enough to be worth asking about rather than
+     stonewalling. */
   if (!best || bestPoints < 2) {
+    if (best && bestPoints >= 1) {
+      const name = best.title || (best.ask && best.ask[0]) || "that";
+      return {
+        text: `I am not sure I follow. Did you mean ${name}?`,
+        chips: [`Tell me about ${name}`].concat((unknown.then || []).slice(0, 2)),
+        id: "unsure",
+      };
+    }
     return { text: unknown.say, chips: unknown.then || [], id: "unknown" };
   }
-  return { text: best.say, chips: best.then || [], id: best.id };
+  return { text: best.say, chips: onward(best.then, data), id: best.id };
+}
+
+/* A chat that ends a turn with nothing to press is a chat that ends.
+   Where an entry names no follow-ups, fall back to the three the
+   greeting offers. */
+function onward(then, data) {
+  if (then && then.length) return then;
+  const greeting = data.greeting || {};
+  return (greeting.then || []).slice(0, 3);
 }

@@ -68,3 +68,15 @@ Run the tests after touching the matching:
 
 They are about the questions it should REFUSE, more than the ones it
 should answer. Node prints a warning about module type — harmless.
+
+### What the chat can hold on to
+
+It keeps two things between turns and nothing else: what the last answer
+was about, and which answers have already been given. That is enough for
+"tell me more", "what was the problem", "what tech did it use" and "what
+else have you built" — all of which are only sentences because something
+came before them.
+
+It is not a model and does not pretend to be. It forgives one typo,
+answers two questions in one message, and when it half-recognises
+something it asks instead of guessing.

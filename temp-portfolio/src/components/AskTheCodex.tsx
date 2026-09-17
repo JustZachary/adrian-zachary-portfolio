@@ -22,6 +22,9 @@ export default function AskTheCodex() {
   const [chips, setChips] = useState<string[]>(GREETING.then || []);
   const [typed, setTyped] = useState("");
   const lastId = useRef<string>("greeting");
+  /* What has already been answered, so "what else have you built" can
+     move on instead of repeating itself. */
+  const seen = useRef<string[]>([]);
   const foot = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
 
@@ -44,8 +47,9 @@ export default function AskTheCodex() {
   function send(question: string) {
     const asked = question.trim();
     if (!asked) return;
-    const reply = answer(asked, DATA, { lastId: lastId.current });
+    const reply = answer(asked, DATA, { lastId: lastId.current, seen: seen.current });
     lastId.current = reply.id;
+    if (reply.id && seen.current.indexOf(reply.id) < 0) seen.current.push(reply.id);
     setSaid((before) => [...before, { from: "them", text: asked }, { from: "me", text: reply.text }]);
     setChips(reply.chips || []);
     setTyped("");

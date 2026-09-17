@@ -87,5 +87,51 @@ eq("more with nothing before it is not an answer", ask("more").id, "unknown");
 check("every answer offers somewhere to go", ask("what have you built?").chips.length > 0);
 check("including the refusals", ask("do you know COBOL?").chips.length > 0);
 
+/* --- stage two: holding a thread ------------------------------------
+
+   The difference between a search box and a conversation is that the
+   second one knows what you were just talking about. None of this needs
+   a model — it needs the last answer kept in a variable. */
+
+/* A question about part of a project, the project named. */
+check("asked for the problem, by name",
+  /cannot see air quality/.test(ask("what was the problem with SmartAirIQ?").text));
+check("asked what he actually did",
+  /Designed the interface/.test(ask("what did you do on SmartAirIQ?").text));
+check("asked what it was built with",
+  /Flutter, Firebase/.test(ask("what tech is SmartAirIQ built with?").text));
+
+/* The same questions, with the project only implied. */
+const p1 = ask("tell me about SmartAirIQ");
+check("what was the problem — about the last thing",
+  /cannot see air quality/.test(ask("what was the problem?", { lastId: p1.id }).text));
+check("and what is it built with",
+  /Flutter/.test(ask("what tech did it use?", { lastId: p1.id }).text));
+check("a bare pointer goes back to the last thing too",
+  /SmartAirIQ|Problem:/.test(ask("what about that one?", { lastId: p1.id }).text));
+eq("but with nothing said yet, it does not invent a subject",
+  ask("what was the problem?").id, "unknown");
+
+/* Moving on. */
+const next = ask("what else have you built?", { lastId: p1.id, seen: [p1.id] });
+check("what else means the one not yet mentioned", /Recruitment/.test(next.text));
+check("and when they are all mentioned, it says so",
+  /everything on here/.test(ask("anything else?", { lastId: next.id, seen: [p1.id, next.id] }).text));
+
+/* Typing quickly. */
+check("one typo is forgiven", /SmartAirIQ/.test(ask("tell me about smartairq").text));
+check("and another", /Recruitment|recruitment/.test(ask("what was the recruitmnt system?").text));
+eq("but a real word is not bent into a match", ask("do you know Kotlin?").id, "unknown");
+
+/* Two questions at once, which is how people actually type. */
+const both = ask("what have you built and how do I contact you?");
+check("both halves are answered", /projects/.test(both.text) && /Email/.test(both.text));
+check("and they are not run together", both.text.indexOf("\n\n") > 0);
+
+/* Nearly a match. */
+const unsure = ask("sains?");
+check("one weak signal asks rather than guesses", /Did you mean|SAINS/.test(unsure.text));
+check("and offers the way forward", unsure.chips.length > 0);
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);
