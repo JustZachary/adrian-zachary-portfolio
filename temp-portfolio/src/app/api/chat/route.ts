@@ -74,9 +74,18 @@ export async function POST(request: Request) {
     const said = json?.choices?.[0]?.message?.content;
     if (!trustworthy(said, found.text)) throw new Error("answer left the context");
     return NextResponse.json({ ...found, text: String(said).trim(), phrased: true });
-  } catch {
+  } catch (err) {
     /* Down, out of credit, slow, or off-script: the retrieved answer is
-       right here and is still true. */
-    return NextResponse.json({ ...found, phrased: false });
+       right here and is still true.
+     *
+     * `why` is returned so the fallback is visible while setting this
+     * up — "provider said 404" is a wrong model id, "answer left the
+     * context" is the model ignoring its brief, and a timeout is a
+     * timeout. It carries no key and no visitor data. */
+    return NextResponse.json({
+      ...found,
+      phrased: false,
+      why: err instanceof Error ? err.message : "provider unavailable",
+    });
   }
 }
