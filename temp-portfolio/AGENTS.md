@@ -40,3 +40,31 @@ new project fit is the wrong end of the problem — change the data.
 `npm run dev` and look at it. There are no tests here; the check is the
 page. A change that cannot be seen on the page is a change nobody asked
 for.
+
+## The chat ("Ask the Codex")
+
+`src/components/AskTheCodex.tsx` is only a mouth. Everything it says
+comes from `src/lib/answer.js`, which reads the same data the page
+renders: `src/data/projects.ts` for the work, `src/data/facts.js` for
+everything else.
+
+There is no model behind it and no API key. That is deliberate: a public
+chat box wired to a paid API is a public invoice, and a language model
+asked "does he know Kubernetes?" will improvise. This one says it
+doesn't know, because it can only repeat sentences somebody wrote.
+
+**To teach it something new, add to `src/data/facts.js`** — a topic with
+`ask` (the words people would type, spelling variants included), `say`
+(the answer, first person) and `then` (what to offer next). Adding a
+project to `projects.ts` teaches the chat about it automatically; no
+second edit.
+
+**Never put anything in `say` that is not already true on the site.**
+The one promise this chat makes is that it does not invent.
+
+Run the tests after touching the matching:
+
+    node src/lib/answer.test.js
+
+They are about the questions it should REFUSE, more than the ones it
+should answer. Node prints a warning about module type — harmless.

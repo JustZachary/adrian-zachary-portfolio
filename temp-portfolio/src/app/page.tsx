@@ -1,6 +1,7 @@
 "use client";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
+import AskTheCodex from "../components/AskTheCodex";
 import { PROJECTS } from "../data/projects";
 import type { Project } from "../data/projects";
 
@@ -681,6 +682,7 @@ export default function Home() {
           </div>
           <p className="font-cinzel text-xs tracking-widest" style={{ color: "rgba(217,234,250,0.35)" }}>© 2026 Adrian Zachary — Forged with Next.js &amp; Tailwind CSS</p>
         </footer>
+        <AskTheCodex />
       </motion.main>
     </>
   );
