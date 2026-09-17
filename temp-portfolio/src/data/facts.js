@@ -81,7 +81,12 @@ export const TOPICS = [
   {
     id: "where",
     ask: ["where are you", "where do you live", "based", "location", "city", "located", "kl", "selangor", "malaysia", "sarawak", "relocate", "remote", "onsite", "office"],
-    say: "I'm from Sibu, Sarawak originally, and I'm in the Klang Valley now — working in Petaling Jaya and staying in Ara Damansara.",
+    /* He said Sibu, Petaling Jaya and Ara Damansara. "Klang Valley" was
+       my summary of the last two and he had never said it — which is
+       the exact failure this whole file exists to prevent, arriving
+       from the side nobody was watching: not the model inventing, the
+       person writing the data tidying. Say what he said. */
+    say: "I'm from Sibu, Sarawak originally. These days I work in Petaling Jaya and stay in Ara Damansara.",
     then: ["What have you built?", "How do I contact you?"],
   },
   {
@@ -106,7 +111,7 @@ export const TOPICS = [
   {
     id: "languages",
     ask: ["language", "languages", "speak", "spoken", "english", "malay", "bahasa", "iban", "multilingual", "fluent"],
-    say: "English and Bahasa Malaysia day to day, and Iban — I'm from Sibu, so it's the one I grew up with.",
+    say: "English and Bahasa Malaysia day to day, and Iban.",
     then: ["Where are you based?", "What have you built?"],
   },
   {
