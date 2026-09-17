@@ -86,6 +86,42 @@ export const TOPICS = [
   },
 ];
 
+/* The things people say to a chat box that are not questions about the
+   work. Left out, every one of them gets "I only know what's on this
+   site", which is technically true and reads like a machine. */
+export const SMALL_TALK = [
+  {
+    id: "bot",
+    ask: ["are you real", "are you a bot", "bot", "ai", "human", "really you", "chatgpt", "robot", "is this you", "automated"],
+    say: "I'm a small chat on Zach's site — not him typing, and not a chatbot with opinions of its own. I can only tell you what's written on this page. For anything else, his email's at the bottom.",
+    then: ["What have you built?", "How do I contact you?"],
+  },
+  {
+    id: "howareyou",
+    ask: ["how are you", "how you doing", "how is it going", "you good", "whats up"],
+    say: "Doing well — mostly deep in cloud architecture reading at the moment. What can I tell you about the work?",
+    then: ["What have you built?", "What are you learning?"],
+  },
+  {
+    id: "compliment",
+    ask: ["nice site", "cool site", "love the design", "great portfolio", "nice work", "impressive", "awesome", "beautiful"],
+    say: "Thank you — the runes were the fun part. Have a look at the projects while you're here.",
+    then: ["What have you built?", "How do I contact you?"],
+  },
+  {
+    id: "why",
+    ask: ["why software", "why engineering", "what do you enjoy", "what drives you", "passion", "motivation", "enjoy most"],
+    say: "The part I like is when a system takes a real workflow problem off somebody's desk — that's why the projects here are monitoring and recruitment rather than demos.",
+    then: ["What have you built?", "What are you learning?"],
+  },
+  {
+    id: "bye",
+    ask: ["bye", "goodbye", "see you", "later", "cheers", "thats all", "that is all", "nothing else"],
+    say: "Good talking to you. The email and CV are at the bottom of the page if anything comes up.",
+    then: ["How do I contact you?"],
+  },
+];
+
 /* Said when somebody only says hello. */
 export const GREETING = {
   say: "Hello — ask me about Zach's projects, the tools he works with, or how to get in touch.",

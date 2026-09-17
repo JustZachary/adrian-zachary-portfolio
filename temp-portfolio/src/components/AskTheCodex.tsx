@@ -10,11 +10,11 @@
 import { useEffect, useRef, useState } from "react";
 import { answer } from "../lib/answer.js";
 import { PROJECTS } from "../data/projects";
-import { TOOLS, TOPICS, GREETING, UNKNOWN } from "../data/facts.js";
+import { TOOLS, TOPICS, SMALL_TALK, GREETING, UNKNOWN } from "../data/facts.js";
 
 type Said = { from: "them" | "me"; text: string };
 
-const DATA = { projects: PROJECTS, topics: TOPICS, tools: TOOLS, greeting: GREETING, unknown: UNKNOWN };
+const DATA = { projects: PROJECTS, topics: TOPICS.concat(SMALL_TALK), tools: TOOLS, greeting: GREETING, unknown: UNKNOWN };
 
 export default function AskTheCodex() {
   const [open, setOpen] = useState(false);
@@ -60,6 +60,7 @@ export default function AskTheCodex() {
     setTyped("");
     setChips([]);
     setBusy(true);
+    const began = Date.now();
 
     let reply = local;
     try {
@@ -80,6 +81,13 @@ export default function AskTheCodex() {
     } catch {
       /* Offline, blocked, or the route is not deployed — `local` stands. */
     }
+
+    /* A held breath. Answers that arrive in 40ms read as a lookup table
+       even when they are right, and a chat that feels mechanical gets
+       one question instead of five. Only ever a pause, never a fake
+       delay long enough to waste somebody's time. */
+    const waited = Date.now() - began;
+    if (waited < 420) await new Promise((go) => setTimeout(go, 420 - waited));
 
     lastId.current = reply.id || local.id;
     if (reply.id && seen.current.indexOf(reply.id) < 0) seen.current.push(reply.id);

@@ -94,5 +94,13 @@ const instructions = brief.replace(/CONTEXT:[\s\S]*$/, "").split("\n").filter((l
 check("nothing else refers to him in the third person",
   !instructions.some((l) => /\b(his|he|him)\b/.test(l)));
 
+/* Human-like has an honest version and a dishonest one. A recruiter who
+   thinks they were chatting with him live, and finds out later, is a
+   worse outcome than a chat that reads a little flat. */
+check("it is told to sound like a person", /Sound like a person in a chat/.test(brief));
+check("and told not to pretend to be him typing",
+  /Never claim to be me typing live/.test(brief) && /small chat on my site/.test(brief));
+check("no 'as an AI'", /never use .*as an AI|Never use headings, bullet points, or the words 'as an AI'/i.test(brief));
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

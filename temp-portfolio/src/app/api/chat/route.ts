@@ -21,10 +21,10 @@
 import { NextResponse } from "next/server";
 import { answer } from "../../../lib/answer.js";
 import { PROJECTS } from "../../../data/projects";
-import { TOOLS, TOPICS, GREETING, UNKNOWN } from "../../../data/facts.js";
+import { TOOLS, TOPICS, SMALL_TALK, GREETING, UNKNOWN } from "../../../data/facts.js";
 import { buildMessages, limiter, providerFrom, tooLong, trustworthy } from "../../../lib/chatapi.js";
 
-const DATA = { projects: PROJECTS, topics: TOPICS, tools: TOOLS, greeting: GREETING, unknown: UNKNOWN };
+const DATA = { projects: PROJECTS, topics: TOPICS.concat(SMALL_TALK), tools: TOOLS, greeting: GREETING, unknown: UNKNOWN };
 const allowed = limiter(12);
 
 type Body = {
