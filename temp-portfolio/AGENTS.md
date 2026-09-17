@@ -3,3 +3,40 @@
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
+
+# This site
+
+The app lives in `temp-portfolio/`. One page, `src/app/page.tsx` — the
+runes, the portal intro and the section layouts are all in there.
+
+## Adding a project
+
+Do NOT write JSX for it. Append an object to `PROJECTS` in
+`src/data/projects.ts` and stop; the page renders every entry the same
+way, and that is the point — a project added by hand is one that ends up
+looking like a different website.
+
+The type in that file is the contract. In short:
+
+- `slug` — unique, also the anchor if there is a case study
+- `eyebrow` / `title` / `blurb` — the line above, the name, one sentence
+- `notes` — Problem / Solution / My Contribution / Outcome, in that order
+- `layout` — `"flow"` for a column of headed paragraphs, `"cards"` for a grid
+- `glow` — alternate `"left"` and `"right"` down the page
+- `tech` — short names, the things a reader would recognise
+- `images` — files in `public/`; one sits beside the text, four make a grid
+
+Images go in `public/` and are referenced by filename alone, no leading
+slash.
+
+## What not to touch without being asked
+
+The portal intro, the rune field and the colour variables in
+`globals.css` are the design. Changing spacing or type there to make a
+new project fit is the wrong end of the problem — change the data.
+
+## Checking the work
+
+`npm run dev` and look at it. There are no tests here; the check is the
+page. A change that cannot be seen on the page is a change nobody asked
+for.
