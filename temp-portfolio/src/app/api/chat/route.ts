@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       headers: { "content-type": "application/json", authorization: `Bearer ${provider.key}` },
       body: JSON.stringify({
         model: provider.model,
-        messages: buildMessages(question, found.text, body.history),
+        messages: buildMessages(question, found.context || found.text, body.history),
         max_tokens: 220,
         temperature: 0.4,
       }),
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     if (!reply.ok) throw new Error(`provider said ${reply.status}`);
     const json = await reply.json();
     const said = json?.choices?.[0]?.message?.content;
-    if (!trustworthy(said, found.text)) throw new Error("answer left the context");
+    if (!trustworthy(said, found.context || found.text)) throw new Error("answer left the context");
     return NextResponse.json({ ...found, text: String(said).trim(), phrased: true });
   } catch (err) {
     /* Down, out of credit, slow, or off-script: the retrieved answer is

@@ -66,6 +66,15 @@ function fromProjects(projects) {
     ].filter(Boolean).join(" "),
     deep: (p.notes || []).map((n) => `${n.title}: ${n.body}`).join("\n\n"),
     title: p.title,
+    /* Everything known about this project, for stage three: the model
+       is allowed to rephrase, and rephrasing needs more vocabulary than
+       the single retrieved sentence or every answer it writes looks
+       like an invention. The retrieved sentence stays the fallback. */
+    context: [
+      `${p.title}: ${p.blurb}`,
+      (p.notes || []).map((n) => `${n.title}: ${n.body}`).join(" "),
+      (p.tech || []).length ? `Built with ${p.tech.join(", ")}.` : "",
+    ].filter(Boolean).join(" "),
     fields: {
       problem: pick(p, /problem/i),
       solution: pick(p, /solution/i),
@@ -233,7 +242,7 @@ export function answer(question, data = {}, context = {}) {
   if (/\b(else|other|another|next)\b/.test(raw)) {
     const rest = entries.filter((e) => e.kind === "project" && seen.indexOf(e.id) < 0 && e.id !== context.lastId);
     if (rest.length) {
-      return { text: rest[0].say, chips: onward(rest[0].then, data), id: rest[0].id };
+      return { text: rest[0].say, chips: onward(rest[0].then, data), id: rest[0].id, context: rest[0].context || rest[0].say };
     }
     if (projects.length) {
       return {
@@ -256,13 +265,14 @@ export function answer(question, data = {}, context = {}) {
       text: subject.fields[field],
       chips: others.slice(0, 2).map((k) => `${k === "tech" ? "What was it built with" : `What was the ${k}`}?`).concat("What else have you built?"),
       id: subject.id,
+      context: subject.context || subject.say,
     };
   }
 
   /* "what about it", "who was that for" — a question with no subject of
      its own belongs to whatever was last said. */
   if (bestPoints < 2 && pointsBack(raw) && last) {
-    return { text: last.deep || last.say, chips: onward(last.then, data), id: last.id };
+    return { text: last.deep || last.say, chips: onward(last.then, data), id: last.id, context: last.context || last.say };
   }
 
   /* Two questions in one message. People do this constantly and a chat
@@ -298,7 +308,7 @@ export function answer(question, data = {}, context = {}) {
     }
     return { text: unknown.say, chips: unknown.then || [], id: "unknown" };
   }
-  return { text: best.say, chips: onward(best.then, data), id: best.id };
+  return { text: best.say, chips: onward(best.then, data), id: best.id, context: best.context || best.say };
 }
 
 /* A chat that ends a turn with nothing to press is a chat that ends.

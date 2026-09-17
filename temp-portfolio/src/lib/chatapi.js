@@ -73,19 +73,26 @@ export function trustworthy(said, context) {
   /* Refusals are fine and expected. */
   if (/^(i (do not|don't) know|i am not sure|i'm not sure)/i.test(text)) return true;
 
-  /* Any long word in the answer that appears nowhere in the context is
-     the model reaching for something of its own. Names of things are
-     what matter here, so short words are ignored. */
-  const known = new Set(String(context || "").toLowerCase().match(/[a-z0-9+#.]{5,}/g) || []);
+  /* Rephrasing inflects words — "design" becomes "designed", "monitor"
+     becomes "monitoring" — so both sides are cut back to a rough stem
+     before comparing. Punctuation goes too, or "firebase." and
+     "firebase" read as different things. */
+  const stem = (w) => w.replace(/(ings?|ed|es|s|ly|ment)$/, "");
+  const bag = (t) => new Set((String(t || "").toLowerCase().match(/[a-z0-9+#]{5,}/g) || []).map(stem));
+
+  const known = bag(context);
   const COMMON = new Set([
     "about", "there", "these", "those", "which", "where", "their", "would", "could", "should",
-    "worked", "working", "build", "built", "building", "project", "projects", "system", "systems",
-    "using", "through", "really", "mostly", "focus", "interface", "experience", "developed",
-    "different", "features", "helped", "learned", "making", "better", "people", "things", "happy",
-    "currently", "looking", "please", "contact", "reach", "anything", "everything", "software",
-  ]);
-  const strange = [...new Set(text.toLowerCase().match(/[a-z0-9+#.]{6,}/g) || [])]
-    .filter((w) => !known.has(w) && !COMMON.has(w));
+    "worked", "working", "build", "built", "building", "project", "system", "using", "through",
+    "really", "mostly", "focus", "experience", "different", "feature", "helped", "learned",
+    "making", "better", "people", "thing", "happy", "currently", "looking", "please", "contact",
+    "reach", "anything", "everything", "software", "simple", "clear", "access", "information",
+    "around", "while", "after", "before", "still", "again", "under", "other", "another",
+  ].map(stem));
+
+  const strange = [...bag(text)].filter((w) => !known.has(w) && !COMMON.has(w));
+  /* Two odd words is somebody writing a sentence. A run of them is a
+     model telling a story about a job he never had. */
   return strange.length <= 2;
 }
 

@@ -67,5 +67,19 @@ eq("and the endpoint can be swapped for any of the free ones",
   providerFrom({ CHAT_API_KEY: "k", CHAT_API_URL: "https://example.test/v1/chat/completions" }).url,
   "https://example.test/v1/chat/completions");
 
+/* The failure this actually had in the wild: handed one retrieved
+   sentence as context, every honest rephrasing of it looked invented,
+   because rephrasing introduces words by definition. The fix was a
+   fuller context — the whole project entry — not a weaker guard. */
+const FULL = "SmartAirIQ: Smart environmental monitoring for real-time air quality. Problem: Users often lack simple access to real-time environmental and air quality information in a clear and accessible format. My Contribution: Designed the application interface, structured the mobile workflow. Built with Flutter, Firebase.";
+check("an honest first-person rephrasing passes",
+  trustworthy("People could not get at air quality information in a form they could read, so I designed the interface and structured the mobile workflow in Flutter.", FULL));
+check("inflected words are not treated as new",
+  trustworthy("I was designing the monitoring interface and the mobile workflows.", FULL));
+check("but an invented employer still fails",
+  !trustworthy("I spent two years at Petronas building internal dashboards and reporting tools.", FULL));
+check("and an invented stack still fails",
+  !trustworthy("It ran on Kubernetes with Terraform, PostgreSQL and a Kafka queue.", FULL));
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);
