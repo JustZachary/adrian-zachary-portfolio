@@ -1,6 +1,8 @@
 "use client";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
+import { PROJECTS } from "../data/projects";
+import type { Project } from "../data/projects";
 
 const RUNES = ["ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚱ", "ᚲ", "ᚷ", "ᚹ", "ᚺ", "ᚾ", "ᛁ", "ᛃ", "ᛇ", "ᛈ", "ᛉ", "ᛊ", "ᛏ", "ᛒ", "ᛖ", "ᛗ", "ᛚ", "ᛜ", "ᛞ", "ᛟ"];
 
@@ -278,6 +280,111 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
   );
 }
 
+/* One project, however many there are.
+ *
+ * Both projects were written out by hand and were already drifting
+ * apart — different heading sizes, different spacing under the tags.
+ * They render from the same code now, so a new entry cannot arrive
+ * looking like a different website. What differs between them is
+ * declared in src/data/projects.ts and nowhere else. */
+function ProjectBlock({ project, onJump, last = false }: { project: Project; onJump: (id: string) => void; last?: boolean }) {
+  const left = project.glow === "left";
+  const cta = project.cta;
+  return (
+    <>
+      <Reveal>
+        <div className={`rounded-2xl p-6 md:p-10 ${last ? "" : "mb-12 "}border border-[#F6BC7C]/15 relative overflow-hidden`} style={{ background: "var(--bg-deep)" }}>
+          <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse 60% 40% at ${left ? "0%" : "100%"} 50%, rgba(246,188,124,0.04) 0%, transparent 70%)` }} />
+          <div className="absolute top-0 left-0 right-0 h-px" style={{ background: `linear-gradient(to ${left ? "right" : "left"}, rgba(246,188,124,0.3), transparent)` }} />
+          <div className="grid lg:grid-cols-2 gap-12 items-start relative z-10">
+            <div>
+              <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.4em] text-xs mb-4 opacity-70">{project.eyebrow}</p>
+              <h3 className="font-cinzel text-3xl font-bold mb-5 text-white" style={project.titleGlow ? { textShadow: "0 0 20px rgba(246,188,124,0.2)" } : undefined}>{project.title}</h3>
+              <p className="font-crimson text-lg leading-relaxed mb-8" style={{ color: "var(--text-dim)" }}>{project.blurb}</p>
+
+              {project.layout === "flow" ? (
+                <div className="space-y-6">
+                  {project.notes.map((note) => (
+                    <div key={note.title}>
+                      <h4 className="font-cinzel text-sm font-semibold mb-1 text-[#F6BC7C] tracking-wider opacity-80">{note.title}</h4>
+                      <p className="font-crimson text-base leading-relaxed" style={{ color: "var(--text-dim)" }}>{note.body}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4 mb-8">
+                  {project.notes.map((note) => (
+                    <ArcaneCard key={note.title}>
+                      <h4 className="font-cinzel text-xs font-semibold mb-1 text-[#F6BC7C] tracking-wider">{note.title}</h4>
+                      <p className="font-crimson text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>{note.body}</p>
+                    </ArcaneCard>
+                  ))}
+                </div>
+              )}
+
+              <div className={`flex flex-wrap gap-2 ${project.layout === "flow" ? "mt-8" : "mb-6"}`}>
+                {project.tech.map((tech) => (
+                  <span key={tech} className="font-cinzel text-xs px-3 py-1 tracking-wider" style={{ background: "rgba(246,188,124,0.12)", border: "1px solid rgba(246,188,124,0.3)", color: "#F6BC7C", borderRadius: "2px" }}>{tech}</span>
+                ))}
+              </div>
+
+              {cta && (
+                <div className="mt-8">
+                  <button onClick={() => onJump(cta.target)} className="font-cinzel text-sm tracking-widest px-6 py-3 transition-all duration-300 hover:bg-[#D9EAFA]/10" style={{ border: "1px solid rgba(217,234,250,0.3)", color: "rgba(217,234,250,0.8)", borderRadius: "2px" }}>{cta.label}</button>
+                </div>
+              )}
+
+              {project.badges && project.badges.length > 0 && (
+                <div className="flex gap-3 flex-wrap">
+                  {project.badges.map((badge, i) => (
+                    <span key={badge} className="font-cinzel text-xs px-5 py-2 tracking-wider" style={i === 0
+                      ? { background: "rgba(246,188,124,0.15)", border: "1px solid rgba(246,188,124,0.4)", color: "#F6BC7C", borderRadius: "2px" }
+                      : { border: "1px solid rgba(217,234,250,0.2)", color: "rgba(217,234,250,0.6)", borderRadius: "2px" }}>{badge}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {project.images.length > 1 ? (
+              <div className="grid grid-cols-2 gap-2 md:gap-3">
+                {project.images.map((img, i) => (
+                  <div key={img} className="relative overflow-hidden rounded-xl border border-[#F6BC7C]/10 group">
+                    <img src={`/${img}`} alt={`${project.title} ${i + 1}`} className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="absolute inset-0 bg-[#F6BC7C]/0 group-hover:bg-[#F6BC7C]/5 transition-colors duration-500" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className={`${project.mediaAfterText ? "order-first lg:order-last " : ""}overflow-hidden rounded-xl border border-[#D9EAFA]/10 group`}>
+                <img src={`/${project.images[0]}`} alt={project.title} className="w-full group-hover:scale-105 transition-transform duration-500" />
+              </div>
+            )}
+          </div>
+        </div>
+      </Reveal>
+
+      {project.caseStudy && (
+        <Reveal>
+          <div id="case-study" className="rounded-2xl p-6 md:p-8 mb-12 border border-[#D9EAFA]/10 relative overflow-hidden" style={{ background: "rgba(217,234,250,0.02)" }}>
+            <div className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(to right, transparent, rgba(217,234,250,0.2), transparent)" }} />
+            <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.4em] text-xs mb-4 opacity-70">{project.caseStudy.eyebrow}</p>
+            <h2 className="font-cinzel text-3xl md:text-4xl font-bold mb-6 text-white">{project.caseStudy.title}</h2>
+            <p className="font-crimson text-lg leading-relaxed max-w-3xl mb-8" style={{ color: "var(--text-dim)" }}>{project.caseStudy.intro}</p>
+            <div className="grid md:grid-cols-2 gap-4">
+              {project.caseStudy.cards.map((card) => (
+                <ArcaneCard key={card.title}>
+                  <h3 className="font-cinzel text-sm font-semibold mb-2 text-[#F6BC7C] tracking-wider">{card.title}</h3>
+                  <p className="font-crimson text-base leading-relaxed" style={{ color: "var(--text-dim)" }}>{card.body}</p>
+                </ArcaneCard>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+      )}
+    </>
+  );
+}
+
 export default function Home() {
   const [entered, setEntered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -532,97 +639,14 @@ export default function Home() {
               <h2 className="font-cinzel text-3xl md:text-5xl font-bold mb-12 text-white">Featured Work</h2>
             </Reveal>
 
-            {/* SmartAirIQ */}
-            <Reveal>
-              <div className="rounded-2xl p-6 md:p-10 mb-12 border border-[#F6BC7C]/15 relative overflow-hidden" style={{ background: "var(--bg-deep)" }}>
-                <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 40% at 0% 50%, rgba(246,188,124,0.04) 0%, transparent 70%)" }} />
-                <div className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(to right, rgba(246,188,124,0.3), transparent)" }} />
-                <div className="grid lg:grid-cols-2 gap-12 items-start relative z-10">
-                  <div>
-                    <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.4em] text-xs mb-4 opacity-70">✦ Featured Project ✦</p>
-                    <h3 className="font-cinzel text-3xl font-bold mb-5 text-white" style={{ textShadow: "0 0 20px rgba(246,188,124,0.2)" }}>SmartAirIQ</h3>
-                    <p className="font-crimson text-lg leading-relaxed mb-8" style={{ color: "var(--text-dim)" }}>Smart environmental monitoring system for real-time air quality tracking and visualization using mobile technologies.</p>
-                    <div className="space-y-6">
-                      {[["Problem", "Users often lack simple access to real-time environmental and air quality information in a clear and accessible format."], ["Solution", "Developed a mobile-based environmental monitoring application capable of displaying air quality data, weather information, and location-based monitoring features."], ["My Contribution", "Designed the application interface, structured the mobile workflow, and implemented frontend integration concepts using Flutter and Firebase."], ["Outcome", "Created a cleaner and more user-friendly monitoring experience for displaying environmental information through a mobile-first interface."]].map(([title, desc]) => (
-                        <div key={title}>
-                          <h4 className="font-cinzel text-sm font-semibold mb-1 text-[#F6BC7C] tracking-wider opacity-80">{title}</h4>
-                          <p className="font-crimson text-base leading-relaxed" style={{ color: "var(--text-dim)" }}>{desc}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-8">
-                      {["Flutter", "Firebase", "Google Maps", "Air Quality API"].map((tech) => (
-                        <span key={tech} className="font-cinzel text-xs px-3 py-1 tracking-wider" style={{ background: "rgba(246,188,124,0.12)", border: "1px solid rgba(246,188,124,0.3)", color: "#F6BC7C", borderRadius: "2px" }}>{tech}</span>
-                      ))}
-                    </div>
-                    <div className="mt-8">
-                      <button onClick={() => scrollTo("case-study")} className="font-cinzel text-sm tracking-widest px-6 py-3 transition-all duration-300 hover:bg-[#D9EAFA]/10" style={{ border: "1px solid rgba(217,234,250,0.3)", color: "rgba(217,234,250,0.8)", borderRadius: "2px" }}>View FYP Case Study</button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 md:gap-3">
-                    {["smartairiq-1.jpeg", "smartairiq-2.jpeg", "smartairiq-3.jpeg", "smartairiq-4.jpeg"].map((img, i) => (
-                      <div key={i} className="relative overflow-hidden rounded-xl border border-[#F6BC7C]/10 group">
-                        <img src={`/${img}`} alt={`SmartAirIQ ${i + 1}`} className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500" />
-                        <div className="absolute inset-0 bg-[#F6BC7C]/0 group-hover:bg-[#F6BC7C]/5 transition-colors duration-500" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Reveal>
-
-            {/* Case Study */}
-            <Reveal>
-              <div id="case-study" className="rounded-2xl p-6 md:p-8 mb-12 border border-[#D9EAFA]/10 relative overflow-hidden" style={{ background: "rgba(217,234,250,0.02)" }}>
-                <div className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(to right, transparent, rgba(217,234,250,0.2), transparent)" }} />
-                <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.4em] text-xs mb-4 opacity-70">📖 Case Study 📖</p>
-                <h2 className="font-cinzel text-3xl md:text-4xl font-bold mb-6 text-white">SmartAirIQ Project Breakdown</h2>
-                <p className="font-crimson text-lg leading-relaxed max-w-3xl mb-8" style={{ color: "var(--text-dim)" }}>SmartAirIQ was developed as an academic environmental monitoring project focused on making air quality information easier to access through a mobile-based interface.</p>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {[["Project Goal", "To provide users with a simple mobile interface for viewing air quality information, location-based monitoring, and basic precaution guidance."], ["System Design", "The project was structured around a mobile-first approach using Flutter for the interface, Firebase concepts for backend support, and Google Maps for location-based visualization."], ["Key Challenge", "One major challenge was planning how environmental data, map display, and precaution information could be presented clearly without overwhelming the user."], ["What I Learned", "This project strengthened my understanding of mobile UI structure, user flow planning, Firebase-based architecture, and how environmental data can be translated into useful user-facing information."]].map(([title, desc]) => (
-                    <ArcaneCard key={title}>
-                      <h3 className="font-cinzel text-sm font-semibold mb-2 text-[#F6BC7C] tracking-wider">{title}</h3>
-                      <p className="font-crimson text-base leading-relaxed" style={{ color: "var(--text-dim)" }}>{desc}</p>
-                    </ArcaneCard>
-                  ))}
-                </div>
-              </div>
-            </Reveal>
-
-            {/* AI Recruitment */}
-            <Reveal>
-              <div className="rounded-2xl p-6 md:p-10 border border-[#F6BC7C]/15 relative overflow-hidden" style={{ background: "var(--bg-deep)" }}>
-                <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 40% at 100% 50%, rgba(246,188,124,0.04) 0%, transparent 70%)" }} />
-                <div className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(to left, rgba(246,188,124,0.3), transparent)" }} />
-                <div className="grid lg:grid-cols-2 gap-12 items-start relative z-10">
-                  <div>
-                    <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.4em] text-xs mb-4 opacity-70">⚔ Enterprise Experience ⚔</p>
-                    <h3 className="font-cinzel text-3xl font-bold mb-5 text-white">AI Recruitment System</h3>
-                    <p className="font-crimson text-lg leading-relaxed mb-8" style={{ color: "var(--text-dim)" }}>AI-enhanced recruitment platform involving resume analysis, interview question generation, and enterprise recruitment workflow improvements.</p>
-                    <div className="grid md:grid-cols-2 gap-4 mb-8">
-                      {[["Problem", "Recruitment screening can be time-consuming when HR teams need to manually review applicant resumes and match them with job requirements."], ["Solution", "Improved the recruitment workflow by supporting AI-assisted resume matching and interview question generation features."], ["My Contribution", "Supported UAT issue fixing, investigated AI feature issues, refined system behavior, and worked on API-related improvements."], ["Outcome", "Helped improve the clarity and efficiency of applicant screening workflows within an enterprise recruitment system."]].map(([title, desc]) => (
-                        <ArcaneCard key={title}>
-                          <h4 className="font-cinzel text-xs font-semibold mb-1 text-[#F6BC7C] tracking-wider">{title}</h4>
-                          <p className="font-crimson text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>{desc}</p>
-                        </ArcaneCard>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-2 mb-6">
-                      {["PHP", "MySQL", "AI Integration", "API"].map((tech) => (
-                        <span key={tech} className="font-cinzel text-xs px-3 py-1 tracking-wider" style={{ background: "rgba(246,188,124,0.12)", border: "1px solid rgba(246,188,124,0.3)", color: "#F6BC7C", borderRadius: "2px" }}>{tech}</span>
-                      ))}
-                    </div>
-                    <div className="flex gap-3 flex-wrap">
-                      <span className="font-cinzel text-xs px-5 py-2 tracking-wider" style={{ background: "rgba(246,188,124,0.15)", border: "1px solid rgba(246,188,124,0.4)", color: "#F6BC7C", borderRadius: "2px" }}>Enterprise Project</span>
-                      <span className="font-cinzel text-xs px-5 py-2 tracking-wider" style={{ border: "1px solid rgba(217,234,250,0.2)", color: "rgba(217,234,250,0.6)", borderRadius: "2px" }}>Internship Project</span>
-                    </div>
-                  </div>
-                  <div className="order-first lg:order-last overflow-hidden rounded-xl border border-[#D9EAFA]/10 group">
-                    <img src="/ai-recruitment.png" alt="AI Recruitment" className="w-full group-hover:scale-105 transition-transform duration-500" />
-                  </div>
-                </div>
-              </div>
-            </Reveal>
+            {PROJECTS.map((project, i) => (
+              <ProjectBlock
+                key={project.slug}
+                project={project}
+                onJump={scrollTo}
+                last={i === PROJECTS.length - 1}
+              />
+            ))}
           </div>
         </section>
 
