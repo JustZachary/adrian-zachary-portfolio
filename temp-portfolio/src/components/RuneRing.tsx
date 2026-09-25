@@ -487,7 +487,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
     eye.y += Math.sin(u * STEPS * Math.PI) * 0.018 * s.hero;
     state.camera.position.copy(eye);
     state.camera.lookAt(aim);
-    if (lamp.current) lamp.current.position.copy(eye).add(tmp.set(0, 0.2, 0));
+    if (lamp.current) { lamp.current.position.copy(eye).add(tmp.set(0, 0.2, 0)); lamp.current.intensity = 14 + 22 * s.hero; }
 
     // the portcullis lifts as you step through
     if (portcullis.current) portcullis.current.position.y = 0.25 + s.hero * 2.2;
@@ -532,9 +532,9 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       let best = 0, bestD = Infinity, second = 0, secondD = Infinity;
       torchGroup.current.children.forEach((m, i) => {
         const tk = torches[i];
-        const flicker = 0.75 + 0.25 * Math.sin(t * 9 + tk.seed) * Math.sin(t * 13.7 + tk.seed * 2);
+        const flicker = 0.88 + 0.08 * Math.sin(t * 5 + tk.seed) + 0.04 * Math.sin(t * 11 + tk.seed * 2);
         const sp = m.children[0] as THREE.Sprite | undefined;
-        if (sp) { sp.material.opacity = 0.9 * flicker; sp.scale.setScalar(0.6 + 0.1 * flicker); }
+        if (sp) { sp.material.opacity = 0.9 * flicker; sp.scale.setScalar(0.6 + 0.06 * flicker); }
         m.getWorldPosition(tmp);
         const dist = tmp.distanceTo(cam.position);
         if (dist < bestD) { second = best; secondD = bestD; bestD = dist; best = i; }
@@ -542,10 +542,12 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       });
       torchGroup.current.children[best].getWorldPosition(tmp);
       torchLight.current.position.copy(tmp);
-      torchLight.current.intensity = 70 + 14 * Math.sin(t * 11 + torches[best].seed);
+      const fl = (sd: number) => 0.94 + 0.03 * Math.sin(t * 3.1 + sd) + 0.02 * Math.sin(t * 7.3 + sd * 2) + 0.01 * Math.sin(t * 13 + sd * 3);
+      const calm = 0.5 + 0.5 * s.hero; // the gate is lit softly; the stair by torchlight
+      torchLight.current.intensity = 70 * fl(torches[best].seed) * calm;
       torchGroup.current.children[second].getWorldPosition(tmp);
       torchLight2.current.position.copy(tmp);
-      torchLight2.current.intensity = 45 + 10 * Math.sin(t * 10 + torches[second].seed);
+      torchLight2.current.intensity = 45 * fl(torches[second].seed) * calm;
     }
 
     // light runs down the stair, step by step; the step you're on is lit
@@ -600,9 +602,9 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       <ambientLight color="#7a6650" intensity={0.55} />
       <hemisphereLight args={["#5a4830", "#0a0806", 0.7]} />
       {/* physically-based lights: candela-ish, so they need to be strong */}
-      <pointLight ref={lamp} color="#F6BC7C" intensity={55} distance={12} decay={2} />
-      <pointLight ref={torchLight} color="#ff9a3c" intensity={70} distance={11} decay={2} />
-      <pointLight ref={torchLight2} color="#ff9a3c" intensity={45} distance={10} decay={2} />
+      <pointLight ref={lamp} color="#f0d6ac" intensity={36} distance={12} decay={2} />
+      <pointLight ref={torchLight} color="#ffb068" intensity={70} distance={11} decay={2} />
+      <pointLight ref={torchLight2} color="#ffb068" intensity={45} distance={10} decay={2} />
 
       {/* the shaft wall, seen from inside, the vault over it and a cornice */}
       <mesh position={[0, -DEPTH / 2 + 0.5, 0]} material={wallMat}>
@@ -775,7 +777,7 @@ export default function RuneRing({ driver, className = "" }: { driver: React.Ref
       <Canvas
         dpr={[1, 1.5]}
         camera={{ position: [2.4, 2.9, 1.0], fov: 60, near: 0.05, far: 40 }}
-        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+        gl={{ antialias: true, alpha: true, powerPreference: "high-performance", toneMappingExposure: 0.8 }}
         style={{ background: "transparent" }}
       >
         <fog attach="fog" args={["#07080a", 3, 19]} />

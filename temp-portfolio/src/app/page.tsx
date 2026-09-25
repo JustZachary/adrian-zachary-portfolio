@@ -564,16 +564,17 @@ export default function Home() {
         }
         .quest-panel::before { left: 18px; }
         .quest-panel::after { right: 18px; content: 'ᛟ'; }
-        @keyframes torchlight {
-          0%, 100% { opacity: 0.55; } 18% { opacity: 0.7; } 37% { opacity: 0.5; } 61% { opacity: 0.75; } 80% { opacity: 0.58; }
-        }
         .torchlight {
           position: fixed; inset: 0; pointer-events: none; z-index: 30;
+          background: radial-gradient(ellipse 70% 60% at 50% 50%, transparent 40%, rgba(0,0,0,0.72) 100%);
+        }
+        @keyframes emberglow { 0%, 100% { opacity: 0.6; } 50% { opacity: 0.85; } }
+        .torchlight::after {
+          content: ''; position: absolute; inset: 0;
           background:
-            radial-gradient(ellipse 70% 60% at 50% 50%, transparent 40%, rgba(0,0,0,0.78) 100%),
-            radial-gradient(ellipse 30% 40% at 0% 60%, rgba(255,140,60,0.10), transparent 70%),
-            radial-gradient(ellipse 30% 40% at 100% 35%, rgba(255,140,60,0.08), transparent 70%);
-          animation: torchlight 4.5s ease-in-out infinite;
+            radial-gradient(ellipse 30% 40% at 0% 60%, rgba(255,140,60,0.09), transparent 70%),
+            radial-gradient(ellipse 30% 40% at 100% 35%, rgba(255,140,60,0.07), transparent 70%);
+          animation: emberglow 7s ease-in-out infinite;
         }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: var(--bg-deep); }
@@ -696,7 +697,7 @@ export default function Home() {
             page its scroll length and useDescent turns scroll into the walk. */}
         <div className="fixed inset-0 z-10 pointer-events-none" style={{ perspective: "1200px" }}>
           <div ref={(el) => { panelRefs.current[0] = el; ringDriver.current.panels[0].el = el; }} className="quest quest-hero">
-            <div className="absolute inset-0 pointer-events-none -z-10" style={{ background: "radial-gradient(ellipse 60% 55% at 50% 50%, rgba(7,8,10,0.55) 0%, transparent 70%)" }} />
+            <div className="absolute -inset-10 pointer-events-none -z-10" style={{ background: "radial-gradient(ellipse 60% 58% at 50% 50%, rgba(7,8,10,0.78) 0%, rgba(7,8,10,0.45) 55%, transparent 100%)" }} />
             <div className="relative flex flex-col items-center text-center">
 
 
