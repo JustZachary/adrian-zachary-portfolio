@@ -433,11 +433,12 @@ export default function Home() {
   const panelRefs = useRef<(HTMLDivElement | null)[]>([]);
   const ringDriver = useRef<RingDriver>({
     u: 0, hero: 0, hold: 1, mouseX: 0, mouseY: 0,
-    panels: LANDINGS.map((l) => ({ el: null, u: l.u, screen: l.screen, shift: 0, fade: l.screen ? 1 : 0 })),
+    panels: LANDINGS.map((l) => ({ el: null, h: 0, u: l.u, screen: l.screen, shift: 0, fade: l.screen ? 1 : 0 })),
   });
   const timeline = useRef<{ start: number; end: number; hold: boolean; i: number; from: number; to: number; travel: number }[]>([]);
   const [totalVh, setTotalVh] = useState(900);
-  const [depth, setDepth] = useState(0);
+  const depthEl = useRef<HTMLSpanElement>(null);
+  const lastDepth = useRef(-1);
 
   const buildTimeline = () => {
     const vh = window.innerHeight;
@@ -445,6 +446,7 @@ export default function Home() {
     let pos = 0;
     LANDINGS.forEach((l, i) => {
       const h = panelRefs.current[i]?.offsetHeight ?? vh;
+      ringDriver.current.panels[i].h = h;
       const travel = Math.max(0, h - vh * 0.78); // px the panel must scroll while you read
       const hold = 0.9 + travel / vh;              // in viewport heights
       segs.push({ start: pos, end: pos + hold, hold: true, i, from: l.u, to: l.u, travel });
@@ -496,7 +498,7 @@ export default function Home() {
       arriving.shift = 0;
     }
     const dep = Math.round(d.u * STEPS);
-    setDepth((prev) => (prev === dep ? prev : dep));
+    if (dep !== lastDepth.current && depthEl.current) { lastDepth.current = dep; depthEl.current.textContent = String(dep); }
   });
 
   /* Nav: a landing's id scrolls to where you stand at it; an anchor
@@ -551,11 +553,10 @@ export default function Home() {
         .quest-hero { width: min(96vw, 1100px); }
         .quest-panel {
           width: min(92vw, 1120px);
-          background: rgba(10,10,8,0.66);
+          background: rgba(10,10,8,0.8);
           border: 1px solid rgba(246,188,124,0.18);
           border-radius: 22px;
           box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 40px 120px rgba(0,0,0,0.65), 0 0 90px rgba(246,188,124,0.05), inset 0 0 60px rgba(0,0,0,0.35);
-          backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
         }
         .quest-panel::before, .quest-panel::after {
           content: 'ᚦ'; position: absolute; top: 14px; font-family: serif; font-size: 14px;
@@ -606,7 +607,7 @@ export default function Home() {
         <div className="torchlight" />
         {/* depth meter */}
         <motion.div className="fixed bottom-5 left-5 z-40 font-cinzel text-[10px] tracking-[0.35em] uppercase select-none" style={{ color: "rgba(246,188,124,0.6)", textShadow: "0 0 12px rgba(246,188,124,0.4)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }}>
-          <span className="opacity-60" style={{ fontFamily: "serif" }}>ᛞ </span>Depth · {depth} steps
+          <span className="opacity-60" style={{ fontFamily: "serif" }}>ᛞ </span>Depth · <span ref={depthEl}>0</span> steps
         </motion.div>
 
         {/* NAVBAR */}

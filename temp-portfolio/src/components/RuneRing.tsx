@@ -54,6 +54,7 @@ const GATE_A = -WEDGE * 2.2;                    // where the entrance is, just a
    frame in here. A ref, not React state, so nothing rerenders. */
 export type QuestPanel = {
   el: HTMLElement | null;
+  h: number;           // cached offsetHeight (measured by the page, not per frame)
   u: number;           // where on the stair it hangs (0..1)
   screen?: boolean;    // true: fixed centre-screen (the hero), not projected
   shift: number;       // px the page scrolls the panel up while you read it
@@ -336,11 +337,38 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const stoneMat = useMemo(() => stoneMaterial(tiledStone(maps, 0.6, 0.6), STONE), [maps]);
   const coneMat = useMemo(() => new THREE.MeshBasicMaterial({ color: EMBER, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), []);
   const ironMat = useMemo(() => new THREE.MeshStandardMaterial({ color: IRON, roughness: 0.45, metalness: 0.7, emissive: "#2a1c0a", emissiveIntensity: 0.25 }), []);
-  const nosingMats = useMemo(() => Array.from({ length: STEPS }, () => new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false })), []);
   const railGeo = useMemo(() => new THREE.TubeGeometry(new HelixCurve(RING_R - 0.14, STEP_THICK / 2 + 0.95), STEPS * 4, 0.035, 8, false), []);
   const railGeo2 = useMemo(() => new THREE.TubeGeometry(new HelixCurve(RING_R - 0.14, STEP_THICK / 2 + 0.5), STEPS * 4, 0.018, 6, false), []);
 
   const steps = useMemo(() => Array.from({ length: STEPS }, (_, k) => stepPose(k)), []);
+
+  /* Every step's parts are instanced: one draw call per part instead of
+     one per step. The nosing pulse is a per-instance colour. */
+  const treadInst = useRef<THREE.InstancedMesh>(null);
+  const nosingInst = useRef<THREE.InstancedMesh>(null);
+  const corbelInst = useRef<THREE.InstancedMesh>(null);
+  const postInst = useRef<THREE.InstancedMesh>(null);
+  const nosingMat = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }), []);
+  const nosingColor = useMemo(() => new THREE.Color(), []);
+  useEffect(() => {
+    const o = new THREE.Object3D();
+    const place = (inst: THREE.InstancedMesh | null, lx: number, ly: number, lz: number, ry = 0) => {
+      if (!inst) return;
+      steps.forEach(({ angle, y }, k) => {
+        // local offset inside the step frame (rotated by -angle), then lifted to y
+        o.position.set(0, y, 0); o.rotation.set(0, -angle, 0); o.updateMatrix();
+        const local = new THREE.Matrix4().makeRotationY(ry).setPosition(lx, ly, lz);
+        o.matrix.multiply(local);
+        inst.setMatrixAt(k, o.matrix);
+      });
+      inst.instanceMatrix.needsUpdate = true;
+    };
+    place(treadInst.current, 0, 0, 0);
+    place(nosingInst.current, (RING_R + PILLAR_R) / 2, STEP_THICK / 2, 0, -WEDGE * 0.48);
+    place(corbelInst.current, RING_R - 0.25, -STEP_THICK / 2 - 0.13, 0);
+    place(postInst.current, RING_R - 0.14, STEP_THICK / 2 + 0.47, 0);
+    if (nosingInst.current) { for (let k = 0; k < STEPS; k++) nosingInst.current.setColorAt(k, GOLD); nosingInst.current.instanceColor!.needsUpdate = true; }
+  }, [steps]);
 
   const runeSlots = useMemo(() => {
     const slots: { x: number; y: number; z: number; tex: THREE.Texture; bob: number; u: number }[] = [];
@@ -379,6 +407,36 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
     return list;
   }, []);
 
+  /* Torch furniture is instanced too: brackets, light cones, niche arches and sills. */
+  const bracketInst = useRef<THREE.InstancedMesh>(null);
+  const coneInst = useRef<THREE.InstancedMesh>(null);
+  const archInst = useRef<THREE.InstancedMesh>(null);
+  const sillInst = useRef<THREE.InstancedMesh>(null);
+  const bracketGeo = useMemo(() => new THREE.CylinderGeometry(0.025, 0.035, 0.42, 6), []);
+  const coneGeo = useMemo(() => new THREE.ConeGeometry(1.1, 2.4, 20, 1, true), []);
+  const archGeo = useMemo(() => new THREE.TorusGeometry(0.42, 0.07, 8, 24, Math.PI), []);
+  const sillGeo = useMemo(() => new THREE.BoxGeometry(0.98, 0.1, 0.14), []);
+  const nicheCount = useMemo(() => torches.filter((t) => t.niche).length, [torches]);
+  useEffect(() => {
+    const o = new THREE.Object3D();
+    const set = (inst: THREE.InstancedMesh | null, only: "all" | "niche", lx: number, ly: number, lz: number, rx: number, ry: number, rz: number) => {
+      if (!inst) return;
+      let i = 0;
+      for (const tk of torches) {
+        if (only === "niche" && !tk.niche) continue;
+        o.position.set(tk.x, tk.y, tk.z); o.rotation.set(0, -tk.angle, 0); o.updateMatrix();
+        const local = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rx, ry, rz)).setPosition(lx, ly, lz);
+        o.matrix.multiply(local);
+        inst.setMatrixAt(i++, o.matrix);
+      }
+      inst.instanceMatrix.needsUpdate = true;
+    };
+    set(bracketInst.current, "all", 0.1, -0.24, 0, 0, 0, 0.35);
+    set(coneInst.current, "all", -0.5, -1.1, 0, 0, 0, 0.5);
+    set(archInst.current, "niche", 0.22, 0.1, 0, 0, Math.PI / 2, 0);
+    set(sillInst.current, "niche", 0.22, -0.55, 0, 0, Math.PI / 2, 0);
+  }, [torches]);
+
   const pilasters = useMemo(() => Array.from({ length: 8 }, (_, i) => (i / 8) * Math.PI * 2 + Math.PI / 8), []);
   const wisps = useMemo(() => Array.from({ length: 7 }, (_, i) => ({ off: i / 7, seed: Math.random() * 10, speed: 0.008 + Math.random() * 0.006 })), []);
 
@@ -410,10 +468,11 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
     const d = driver.current;
     const s = smooth.current;
     const k = 1 - Math.exp(-dt * 4.5);
+    const ku = 1 - Math.exp(-dt * 9);
     s.mx += (d.mouseX - s.mx) * k;
     s.my += (d.mouseY - s.my) * k;
-    s.u += (d.u - s.u) * k;
-    s.hero += (d.hero - s.hero) * k;
+    s.u += (d.u - s.u) * ku;
+    s.hero += (d.hero - s.hero) * ku;
     s.hold += (d.hold - s.hold) * k;
 
     const t = state.clock.elapsedTime;
@@ -440,7 +499,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       if (!p.el) continue;
       // a panel taller than the screen is read from the top: it settles
       // just under the nav and scrolls up while you stand at its landing
-      const h = p.el.offsetHeight;
+      const h = p.h || p.el.offsetHeight;
       const tall = h > size.height - NAV - 60;
       const topCentre = NAV + 28 + h / 2;
       if (p.screen) {
@@ -490,9 +549,13 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
     }
 
     // light runs down the stair, step by step; the step you're on is lit
-    for (let i = 0; i < STEPS; i++) {
-      const wave = Math.sin(t * 2.2 - i * 0.45);
-      nosingMats[i].opacity = 0.45 + 0.4 * Math.max(0, wave) + (Math.abs(u * STEPS - i) < 1.5 ? 0.3 : 0);
+    if (nosingInst.current) {
+      for (let i = 0; i < STEPS; i++) {
+        const wave = Math.sin(t * 2.2 - i * 0.45);
+        const b = 0.45 + 0.4 * Math.max(0, wave) + (Math.abs(u * STEPS - i) < 1.5 ? 0.3 : 0);
+        nosingInst.current.setColorAt(i, nosingColor.copy(GOLD).multiplyScalar(b));
+      }
+      nosingInst.current.instanceColor!.needsUpdate = true;
     }
 
     if (wispGroup.current) {
@@ -543,7 +606,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
 
       {/* the shaft wall, seen from inside, the vault over it and a cornice */}
       <mesh position={[0, -DEPTH / 2 + 0.5, 0]} material={wallMat}>
-        <cylinderGeometry args={[WALL_R, WALL_R, DEPTH + 8, 96, 1, true]} />
+        <cylinderGeometry args={[WALL_R, WALL_R, DEPTH + 8, 64, 1, true]} />
       </mesh>
       <mesh position={[0, 4.5, 0]} material={wallMat}>
         <sphereGeometry args={[WALL_R, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
@@ -640,15 +703,11 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
         <shaderMaterial args={[sealShader]} vertexColors transparent depthWrite={false} blending={THREE.AdditiveBlending} />
       </points>
 
-      {/* the steps: tread, glowing nosing, corbel beneath, baluster post */}
-      {steps.map(({ angle, y }, k) => (
-        <group key={k} rotation={[0, -angle, 0]} position={[0, y, 0]}>
-          <mesh geometry={stepGeo} material={stepMat} />
-          <mesh geometry={nosingGeo} material={nosingMats[k]} position={[(RING_R + PILLAR_R) / 2, STEP_THICK / 2, 0]} rotation={[0, -WEDGE * 0.48, 0]} />
-          <mesh geometry={corbelGeo} material={stoneMat} position={[RING_R - 0.25, -STEP_THICK / 2 - 0.13, 0]} />
-          <mesh geometry={postGeo} material={ironMat} position={[RING_R - 0.14, STEP_THICK / 2 + 0.47, 0]} />
-        </group>
-      ))}
+      {/* the steps: tread, glowing nosing, corbel beneath, baluster post — instanced */}
+      <instancedMesh ref={treadInst} args={[stepGeo, stepMat, STEPS]} frustumCulled={false} />
+      <instancedMesh ref={nosingInst} args={[nosingGeo, nosingMat, STEPS]} frustumCulled={false} />
+      <instancedMesh ref={corbelInst} args={[corbelGeo, stoneMat, STEPS]} frustumCulled={false} />
+      <instancedMesh ref={postInst} args={[postGeo, ironMat, STEPS]} frustumCulled={false} />
       <mesh geometry={railGeo} material={ironMat} />
       <mesh geometry={railGeo2} material={ironMat} />
 
@@ -668,33 +727,20 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
         ))}
       </group>
 
-      {/* torches */}
+      {/* torches: the flames are sprites (one each), the rest is instanced */}
       <group ref={torchGroup}>
         {torches.map((tk, i) => (
           <group key={i} position={[tk.x, tk.y, tk.z]} rotation={[0, -tk.angle, 0]}>
             <sprite scale={[0.6, 0.6, 1]}>
               <spriteMaterial map={glow} color={EMBER} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
             </sprite>
-            <mesh position={[0.1, -0.24, 0]} rotation={[0, 0, 0.35]} material={ironMat}>
-              <cylinderGeometry args={[0.025, 0.035, 0.42, 6]} />
-            </mesh>
-            {/* a cone of torchlight falling on the steps below */}
-            <mesh position={[-0.5, -1.1, 0]} rotation={[0, 0, 0.5]} material={coneMat}>
-              <coneGeometry args={[1.1, 2.4, 20, 1, true]} />
-            </mesh>
-            {tk.niche && (
-              <>
-                <mesh position={[0.22, 0.1, 0]} rotation={[0, Math.PI / 2, 0]} material={stoneMat}>
-                  <torusGeometry args={[0.42, 0.07, 8, 24, Math.PI]} />
-                </mesh>
-                <mesh position={[0.22, -0.55, 0]} rotation={[0, Math.PI / 2, 0]} material={stoneMat}>
-                  <boxGeometry args={[0.98, 0.1, 0.14]} />
-                </mesh>
-              </>
-            )}
           </group>
         ))}
       </group>
+      <instancedMesh ref={bracketInst} args={[bracketGeo, ironMat, torches.length]} frustumCulled={false} />
+      <instancedMesh ref={coneInst} args={[coneGeo, coneMat, torches.length]} frustumCulled={false} />
+      <instancedMesh ref={archInst} args={[archGeo, stoneMat, nicheCount]} frustumCulled={false} />
+      <instancedMesh ref={sillInst} args={[sillGeo, stoneMat, nicheCount]} frustumCulled={false} />
 
       {/* the floor of the well */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -DEPTH - 0.55, 0]} material={floorMat}>
@@ -727,7 +773,7 @@ export default function RuneRing({ driver, className = "" }: { driver: React.Ref
   return (
     <div className={`absolute inset-0 ${className}`} aria-hidden>
       <Canvas
-        dpr={[1, 1.75]}
+        dpr={[1, 1.5]}
         camera={{ position: [2.4, 2.9, 1.0], fov: 60, near: 0.05, far: 40 }}
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
         style={{ background: "transparent" }}
