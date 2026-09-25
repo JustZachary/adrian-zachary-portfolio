@@ -1,4 +1,8 @@
 "use client";
+/* eslint-disable react-hooks/purity, react-hooks/immutability --
+   this file is a three.js render loop: it seeds geometry with random
+   numbers once and mutates its own typed-array buffers every frame,
+   which is how WebGL scenes work, not a React state bug. */
 /* The page IS a spiral stair in an underground well.
  *
  * You arrive through a gated archway at the top — the dungeon entrance —
@@ -33,7 +37,6 @@ const EMBER = new THREE.Color("#ff9a3c");
 const STONE = "#7a6d55";
 const STONE_LIGHT = "#948468";
 const STONE_DARK = "#5e5446";
-const IRON = "#4a3d2e";
 const RUNES = ["ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚱ", "ᚲ", "ᚷ", "ᚹ", "ᚺ", "ᚾ", "ᛁ", "ᛃ", "ᛇ", "ᛈ", "ᛉ", "ᛊ", "ᛏ", "ᛒ", "ᛖ", "ᛗ", "ᛚ", "ᛜ", "ᛞ", "ᛟ"];
 
 /* The well's shape. */
@@ -196,7 +199,7 @@ function makeStoneMaps() {
   };
   return { map: tex(cCol, true), normalMap: tex(cNor, false), roughnessMap: tex(cRgh, false) };
 }
-type StoneMaps = ReturnType<typeof makeStoneMaps>;
+type StoneMaps = { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: THREE.Texture };
 function tiledStone(src: StoneMaps, rx: number, ry: number): StoneMaps {
   const c = (t: THREE.Texture) => { const k = t.clone(); k.repeat.set(rx, ry); k.needsUpdate = true; return k; };
   return { map: c(src.map), normalMap: c(src.normalMap), roughnessMap: c(src.roughnessMap) };
@@ -299,20 +302,34 @@ function makeSealShader(glow: THREE.Texture) {
    little below level. hero=0 is standing in the gate at the top looking
    across the landing into the well; it blends into the walk. */
 function poseAt(u: number, hero: number, mx: number, my: number, eye: THREE.Vector3, aim: THREE.Vector3) {
-  const a = angleAt(u);
-  const y = treadY(u) + STEP_THICK / 2 + EYE;
-  const px = Math.cos(a) * WALK_R, pz = Math.sin(a) * WALK_R;
-  const ahead = a + AHEAD + mx * 0.4;
-  const ax = Math.cos(ahead) * WALK_R, az = Math.sin(ahead) * WALK_R;
-  const ay = treadY(u + AHEAD / (TURNS * Math.PI * 2)) + STEP_THICK / 2 + EYE - 0.35 - my * 0.5;
-  // in the gate: eye at the threshold, looking at the seal and the drop beyond
-  const gx = Math.cos(GATE_A) * (WALL_R - 0.6), gz = Math.sin(GATE_A) * (WALL_R - 0.6), gy = treadY(0) + STEP_THICK / 2 + EYE + 0.5;
-  // aim past the seal into the well, so the spiral falls away below
-  const lx = Math.cos(GATE_A + 0.9) * 1.4 - mx * 0.6, ly = treadY(0) - 2.6 - my * 0.6, lz = Math.sin(GATE_A + 0.9) * 1.4;
+  /* Both poses are described in cylindrical terms — angle round the
+     pillar, radius, height — and blended there, so the path from the
+     gate onto the stair sweeps round the landing. Blending x/y/z would
+     cut a straight chord through the middle of the shaft (and the
+     pillar) whenever the stair target is already round the bend. */
   const b = 1 - hero;
-  const e = b * b * (3 - 2 * b);
-  eye.set(px + (gx - px) * e, y + (gy - y) * e, pz + (gz - pz) * e);
-  aim.set(ax + (lx - ax) * e, ay + (ly - ay) * e, az + (lz - az) * e);
+  const e = b * b * (3 - 2 * b); // 1 = in the gate, 0 = walking
+  // walking: on the tread, looking down the stair a little below level
+  const wa = angleAt(u);
+  const wr = WALK_R;
+  const wy = treadY(u) + STEP_THICK / 2 + EYE;
+  const wLookDa = AHEAD, wLookR = WALK_R;
+  const wLookY = treadY(u + AHEAD / (TURNS * Math.PI * 2)) + STEP_THICK / 2 + EYE - 0.35;
+  // in the gate: at the threshold, high, looking across the seal into the well
+  const ga = GATE_A;
+  const gr = WALL_R - 0.6;
+  const gy = treadY(0) + STEP_THICK / 2 + EYE + 0.5;
+  const gLookDa = 0.9 + Math.PI * 0.35, gLookR = 0.9; // toward the far side, past the seal
+  const gLookY = treadY(0) - 2.6;
+  // the eye's angle unwinds from the gate onto the stair the short way
+  const ea = wa + (ga - wa) * e;
+  const er = wr + (gr - wr) * e;
+  const ey = wy + (gy - wy) * e;
+  eye.set(Math.cos(ea) * er, ey, Math.sin(ea) * er);
+  const la = ea + (wLookDa + (gLookDa - wLookDa) * e) + mx * 0.4;
+  const lr = wLookR + (gLookR - wLookR) * e;
+  const ly = wLookY + (gLookY - wLookY) * e - my * 0.5;
+  aim.set(Math.cos(la) * lr, ly, Math.sin(la) * lr);
 }
 
 /* Where a quest panel hangs for a landing at u: exactly where you look
