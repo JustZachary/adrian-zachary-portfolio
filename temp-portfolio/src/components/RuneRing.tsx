@@ -29,23 +29,23 @@ import * as THREE from "three";
 const GOLD = new THREE.Color("#F6BC7C");
 const SILVER = new THREE.Color("#D9EAFA");
 const EMBER = new THREE.Color("#ff9a3c");
-const STONE = "#2a261c";
-const STONE_LIGHT = "#3a3324";
-const STONE_DARK = "#1c1913";
-const IRON = "#3b3126";
+const STONE = "#7a6d55";
+const STONE_LIGHT = "#948468";
+const STONE_DARK = "#5e5446";
+const IRON = "#4a3d2e";
 const RUNES = ["ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚱ", "ᚲ", "ᚷ", "ᚹ", "ᚺ", "ᚾ", "ᛁ", "ᛃ", "ᛇ", "ᛈ", "ᛉ", "ᛊ", "ᛏ", "ᛒ", "ᛖ", "ᛗ", "ᛚ", "ᛜ", "ᛞ", "ᛟ"];
 
 /* The well's shape. */
-export const RING_R = 2.7;       // outer radius of the steps
-export const PILLAR_R = 0.8;     // the central pillar
-export const WALL_R = 3.9;       // the shaft wall
-export const TURNS = 6.5;        // how many times the stair winds
-export const DEPTH = 30;         // how far down it goes
+export const RING_R = 2.9;       // outer radius of the steps
+export const PILLAR_R = 0.75;    // the central pillar
+export const WALL_R = 4.1;       // the shaft wall
+export const TURNS = 8;          // how many times the stair winds
+export const DEPTH = 38;         // how far down it goes
 export const STEPS_PER_TURN = 16;
 export const STEPS = Math.round(TURNS * STEPS_PER_TURN);
 const WEDGE = (Math.PI * 2) / STEPS_PER_TURN;
 const STEP_THICK = 0.16;
-const WALK_R = (RING_R + PILLAR_R) / 2 + 0.15; // where you walk
+const WALK_R = (RING_R + PILLAR_R) / 2 + 0.3;  // where you walk
 const EYE = 1.4;                                // eye height above the tread
 const AHEAD = 0.85;                             // radians you look ahead
 const GATE_A = -WEDGE * 2.2;                    // where the entrance is, just above step 0
@@ -104,7 +104,87 @@ function makeRuneTexture(rune: string) {
   return t;
 }
 
-/* Rough masonry: noise, cracks and block courses, generated once. */
+/* Masonry with relief. A height field — value noise over block courses
+   with recessed mortar — becomes a colour map, a normal map (Sobel) and
+   a roughness map, so torchlight actually rakes across the stone. */
+function makeStoneMaps() {
+  const size = 512;
+  const grid = 24;
+  const rnd = (x: number, y: number) => {
+    const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return n - Math.floor(n);
+  };
+  const smooth = (t: number) => t * t * (3 - 2 * t);
+  const noise = (x: number, y: number) => {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = smooth(x - xi), yf = smooth(y - yi);
+    const a = rnd(xi, yi), b = rnd(xi + 1, yi), c = rnd(xi, yi + 1), d = rnd(xi + 1, yi + 1);
+    return a + (b - a) * xf + (c - a) * yf + (a - b - c + d) * xf * yf;
+  };
+  const height = new Float32Array(size * size);
+  const tone = new Float32Array(size * size);
+  const course = size / 4;           // 4 courses per tile
+  const block = size / 2;            // 2 blocks per course
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const row = Math.floor(y / course);
+      const off = row % 2 ? block / 2 : 0;
+      const bx = ((x + off) % block) / block, by = (y % course) / course;
+      // mortar: a soft groove along block edges
+      const ex = Math.min(bx, 1 - bx) * block, ey = Math.min(by, 1 - by) * course;
+      const edge = Math.min(ex, ey);
+      const mortar = 1 - Math.min(1, edge / 9);
+      const bId = Math.floor((x + off) / block) + row * 7;
+      const bt = 0.75 + rnd(bId, 3) * 0.5;      // each block its own tone
+      let n = 0, amp = 0.5, f = grid / size;
+      for (let o = 0; o < 4; o++) { n += noise(x * f, y * f) * amp; amp *= 0.5; f *= 2; }
+      const pits = Math.pow(noise(x * 0.09, y * 0.09), 6) * 0.6;
+      const h = (1 - mortar * 0.9) * (0.55 + n * 0.45) - pits;
+      height[y * size + x] = h;
+      tone[y * size + x] = bt * (0.6 + n * 0.5) * (1 - mortar * 0.55);
+    }
+  }
+  const at = (x: number, y: number) => height[((y + size) % size) * size + ((x + size) % size)];
+  const mk = () => { const c = document.createElement("canvas"); c.width = c.height = size; return c; };
+  const cCol = mk(), cNor = mk(), cRgh = mk();
+  const iCol = cCol.getContext("2d")!.createImageData(size, size);
+  const iNor = cNor.getContext("2d")!.createImageData(size, size);
+  const iRgh = cRgh.getContext("2d")!.createImageData(size, size);
+  const base = [0x8a, 0x7e, 0x66];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const t = tone[y * size + x];
+      const warm = 0.9 + rnd(x, y) * 0.1;
+      iCol.data[i] = base[0] * t * warm; iCol.data[i + 1] = base[1] * t; iCol.data[i + 2] = base[2] * t * (2 - warm); iCol.data[i + 3] = 255;
+      const dx = (at(x + 1, y) - at(x - 1, y)) * 3.5, dy = (at(x, y + 1) - at(x, y - 1)) * 3.5;
+      const len = Math.hypot(dx, dy, 1);
+      iNor.data[i] = ((-dx / len) * 0.5 + 0.5) * 255; iNor.data[i + 1] = ((-dy / len) * 0.5 + 0.5) * 255; iNor.data[i + 2] = (1 / len * 0.5 + 0.5) * 255; iNor.data[i + 3] = 255;
+      const r = 0.7 + (1 - height[y * size + x]) * 0.3;
+      iRgh.data[i] = iRgh.data[i + 1] = iRgh.data[i + 2] = r * 255; iRgh.data[i + 3] = 255;
+    }
+  }
+  cCol.getContext("2d")!.putImageData(iCol, 0, 0);
+  cNor.getContext("2d")!.putImageData(iNor, 0, 0);
+  cRgh.getContext("2d")!.putImageData(iRgh, 0, 0);
+  const tex = (c: HTMLCanvasElement, srgb: boolean) => {
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 8;
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  return { map: tex(cCol, true), normalMap: tex(cNor, false), roughnessMap: tex(cRgh, false) };
+}
+type StoneMaps = ReturnType<typeof makeStoneMaps>;
+function tiledStone(src: StoneMaps, rx: number, ry: number): StoneMaps {
+  const c = (t: THREE.Texture) => { const k = t.clone(); k.repeat.set(rx, ry); k.needsUpdate = true; return k; };
+  return { map: c(src.map), normalMap: c(src.normalMap), roughnessMap: c(src.roughnessMap) };
+}
+function stoneMaterial(maps: StoneMaps, color: string, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) {
+  return new THREE.MeshStandardMaterial({ color, map: maps.map, normalMap: maps.normalMap, normalScale: new THREE.Vector2(1.1, 1.1), roughnessMap: maps.roughnessMap, roughness: 1, metalness: 0.02, ...extra });
+}
+
+/* (kept for the landing collar and small parts) */
 function makeStoneTexture() {
   const size = 256;
   const c = document.createElement("canvas");
@@ -165,7 +245,7 @@ function makeSeal(n: number) {
     const c = Math.random() < 0.82 ? GOLD : SILVER;
     const b = 0.6 + Math.random() * 0.4;
     col[i * 3] = c.r * b; col[i * 3 + 1] = c.g * b; col[i * 3 + 2] = c.b * b;
-    sz[i] = 0.03 + Math.random() * 0.06;
+    sz[i] = 0.01 + Math.random() * 0.022;
     seed[i] = Math.random() * Math.PI * 2;
   }
   return { pos, col, sz, seed };
@@ -205,8 +285,9 @@ function poseAt(u: number, hero: number, mx: number, my: number, eye: THREE.Vect
   const ax = Math.cos(ahead) * WALK_R, az = Math.sin(ahead) * WALK_R;
   const ay = treadY(u + AHEAD / (TURNS * Math.PI * 2)) + STEP_THICK / 2 + EYE - 0.35 - my * 0.5;
   // in the gate: eye at the threshold, looking at the seal and the drop beyond
-  const gx = Math.cos(GATE_A) * (WALL_R - 0.55), gz = Math.sin(GATE_A) * (WALL_R - 0.55), gy = treadY(0) + STEP_THICK / 2 + EYE;
-  const lx = Math.cos(GATE_A + 0.5) * 0.4 - mx * 0.6, ly = treadY(0) + 0.35 - my * 0.5, lz = Math.sin(GATE_A + 0.5) * 0.4;
+  const gx = Math.cos(GATE_A) * (WALL_R - 0.6), gz = Math.sin(GATE_A) * (WALL_R - 0.6), gy = treadY(0) + STEP_THICK / 2 + EYE + 0.5;
+  // aim past the seal into the well, so the spiral falls away below
+  const lx = Math.cos(GATE_A + 0.9) * 1.4 - mx * 0.6, ly = treadY(0) - 2.6 - my * 0.6, lz = Math.sin(GATE_A + 0.9) * 1.4;
   const b = 1 - hero;
   const e = b * b * (3 - 2 * b);
   eye.set(px + (gx - px) * e, y + (gy - y) * e, pz + (gz - pz) * e);
@@ -235,13 +316,15 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
 
   const glow = useMemo(() => makeGlowTexture(), []);
   const stone = useMemo(() => makeStoneTexture(), []);
-  const tiled = (rx: number, ry: number) => { const t = stone.clone(); t.repeat.set(rx, ry); t.needsUpdate = true; return t; };
-  const stoneWall = useMemo(() => tiled(10, 14), [stone]); // eslint-disable-line react-hooks/exhaustive-deps
-  const stonePillar = useMemo(() => tiled(2, 14), [stone]); // eslint-disable-line react-hooks/exhaustive-deps
-  const stoneLanding = useMemo(() => tiled(4, 1), [stone]); // eslint-disable-line react-hooks/exhaustive-deps
-  const stoneFloor = useMemo(() => tiled(6, 6), [stone]); // eslint-disable-line react-hooks/exhaustive-deps
+  const maps = useMemo(() => makeStoneMaps(), []);
+  // one tile ≈ 2 world units, so texel density is even across surfaces
+  const wallMat = useMemo(() => stoneMaterial(tiledStone(maps, 13, 23), STONE_DARK, { side: THREE.BackSide }), [maps]);
+  const pillarMat = useMemo(() => stoneMaterial(tiledStone(maps, 2.5, 23), STONE_LIGHT), [maps]);
+  const floorMat = useMemo(() => stoneMaterial(tiledStone(maps, 4, 4), STONE_DARK), [maps]);
+  const landingMat = useMemo(() => stoneMaterial(tiledStone(maps, 3, 0.4), STONE), [maps]);
+  const stoneLanding = useMemo(() => { const t = stone.clone(); t.repeat.set(4, 1); t.needsUpdate = true; return t; }, [stone]);
   const runeTextures = useMemo(() => RUNES.map(makeRuneTexture), []);
-  const sealData = useMemo(() => makeSeal(2400), []);
+  const sealData = useMemo(() => makeSeal(1100), []);
   const sealShader = useMemo(() => makeSealShader(glow), [glow]);
 
   /* Shared geometry and materials. */
@@ -249,8 +332,9 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const nosingGeo = useMemo(() => new THREE.BoxGeometry(RING_R - PILLAR_R + 0.05, 0.012, 0.02), []);
   const postGeo = useMemo(() => new THREE.CylinderGeometry(0.035, 0.045, 0.95, 6), []);
   const corbelGeo = useMemo(() => new THREE.BoxGeometry(0.34, 0.26, 0.3), []);
-  const stepMat = useMemo(() => new THREE.MeshStandardMaterial({ color: STONE_LIGHT, map: stone, roughness: 0.9, metalness: 0.05, emissive: "#1a1408", emissiveIntensity: 0.35 }), [stone]);
-  const stoneMat = useMemo(() => new THREE.MeshStandardMaterial({ color: STONE, map: stone, roughness: 0.95 }), [stone]);
+  const stepMat = useMemo(() => stoneMaterial(tiledStone(maps, 1.2, 0.5), STONE_LIGHT, { emissive: "#2a2012", emissiveIntensity: 0.35 }), [maps]);
+  const stoneMat = useMemo(() => stoneMaterial(tiledStone(maps, 0.6, 0.6), STONE), [maps]);
+  const coneMat = useMemo(() => new THREE.MeshBasicMaterial({ color: EMBER, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), []);
   const ironMat = useMemo(() => new THREE.MeshStandardMaterial({ color: IRON, roughness: 0.45, metalness: 0.7, emissive: "#2a1c0a", emissiveIntensity: 0.25 }), []);
   const nosingMats = useMemo(() => Array.from({ length: STEPS }, () => new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false })), []);
   const railGeo = useMemo(() => new THREE.TubeGeometry(new HelixCurve(RING_R - 0.14, STEP_THICK / 2 + 0.95), STEPS * 4, 0.035, 8, false), []);
@@ -351,10 +435,17 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
 
     // quest panels: project each anchor to the screen and move the DOM
     const cam = state.camera;
+    const NAV = 84;
     for (const p of d.panels) {
       if (!p.el) continue;
+      // a panel taller than the screen is read from the top: it settles
+      // just under the nav and scrolls up while you stand at its landing
+      const h = p.el.offsetHeight;
+      const tall = h > size.height - NAV - 60;
+      const topCentre = NAV + 28 + h / 2;
       if (p.screen) {
-        p.el.style.transform = `translate(${size.width / 2}px, ${size.height / 2 - p.shift}px) translate(-50%, -50%)`;
+        const cy = tall ? topCentre : size.height / 2;
+        p.el.style.transform = `translate(${size.width / 2}px, ${cy - p.shift}px) translate(-50%, -50%)`;
         p.el.style.opacity = String(p.fade);
         p.el.style.pointerEvents = p.fade > 0.5 ? "auto" : "none";
         continue;
@@ -370,7 +461,9 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       const scale = Math.min(1, restDist / Math.max(dist, 0.001));
       const near = 1 - Math.min(1, Math.max(0, (dist - 5) / 7));
       const op = behind ? 0 : near * p.fade;
-      p.el.style.transform = `translate(${sx}px, ${sy - p.shift}px) translate(-50%, -50%) scale(${scale})`;
+      const w = tall ? Math.min(1, Math.max(0, (scale - 0.8) / 0.2)) : 0;
+      const cy = sy * (1 - w) + topCentre * w;
+      p.el.style.transform = `translate(${sx}px, ${cy - p.shift}px) translate(-50%, -50%) scale(${scale})`;
       p.el.style.opacity = String(op);
       p.el.style.pointerEvents = op > 0.6 && scale > 0.9 ? "auto" : "none";
     }
@@ -390,10 +483,10 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       });
       torchGroup.current.children[best].getWorldPosition(tmp);
       torchLight.current.position.copy(tmp);
-      torchLight.current.intensity = 12 + 3 * Math.sin(t * 11 + torches[best].seed);
+      torchLight.current.intensity = 70 + 14 * Math.sin(t * 11 + torches[best].seed);
       torchGroup.current.children[second].getWorldPosition(tmp);
       torchLight2.current.position.copy(tmp);
-      torchLight2.current.intensity = 9 + 3 * Math.sin(t * 10 + torches[second].seed);
+      torchLight2.current.intensity = 45 + 10 * Math.sin(t * 10 + torches[second].seed);
     }
 
     // light runs down the stair, step by step; the step you're on is lit
@@ -441,20 +534,19 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
 
   return (
     <>
-      <ambientLight color="#6b5a45" intensity={1.15} />
-      <hemisphereLight args={["#3a2e20", "#050403", 0.6]} />
-      <pointLight ref={lamp} color="#F6BC7C" intensity={10} distance={9} decay={2} />
-      <pointLight ref={torchLight} color="#ff9a3c" intensity={14} distance={8} decay={2} />
-      <pointLight ref={torchLight2} color="#ff9a3c" intensity={9} distance={7} decay={2} />
+      <ambientLight color="#7a6650" intensity={0.55} />
+      <hemisphereLight args={["#5a4830", "#0a0806", 0.7]} />
+      {/* physically-based lights: candela-ish, so they need to be strong */}
+      <pointLight ref={lamp} color="#F6BC7C" intensity={55} distance={12} decay={2} />
+      <pointLight ref={torchLight} color="#ff9a3c" intensity={70} distance={11} decay={2} />
+      <pointLight ref={torchLight2} color="#ff9a3c" intensity={45} distance={10} decay={2} />
 
       {/* the shaft wall, seen from inside, the vault over it and a cornice */}
-      <mesh position={[0, -DEPTH / 2 + 0.5, 0]}>
-        <cylinderGeometry args={[WALL_R, WALL_R, DEPTH + 8, 64, 1, true]} />
-        <meshStandardMaterial color={STONE_DARK} map={stoneWall} roughness={1} side={THREE.BackSide} />
+      <mesh position={[0, -DEPTH / 2 + 0.5, 0]} material={wallMat}>
+        <cylinderGeometry args={[WALL_R, WALL_R, DEPTH + 8, 96, 1, true]} />
       </mesh>
-      <mesh position={[0, 4.5, 0]}>
+      <mesh position={[0, 4.5, 0]} material={wallMat}>
         <sphereGeometry args={[WALL_R, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={STONE_DARK} map={stoneWall} roughness={1} side={THREE.BackSide} />
       </mesh>
       <mesh position={[0, 4.4, 0]}>
         <torusGeometry args={[WALL_R - 0.05, 0.12, 8, 64]} />
@@ -514,9 +606,8 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       </group>
 
       {/* the pillar the stair winds round, with its bands and collars */}
-      <mesh position={[0, -DEPTH / 2 + 0.5, 0]}>
-        <cylinderGeometry args={[PILLAR_R, PILLAR_R * 1.08, DEPTH + 8, 32]} />
-        <meshStandardMaterial color={STONE_LIGHT} map={stonePillar} roughness={0.9} />
+      <mesh position={[0, -DEPTH / 2 + 0.5, 0]} material={pillarMat}>
+        <cylinderGeometry args={[PILLAR_R, PILLAR_R * 1.08, DEPTH + 8, 48]} />
       </mesh>
       {Array.from({ length: Math.floor(TURNS) + 1 }, (_, i) => (
         <group key={i} position={[0, treadY(i / TURNS) - 0.6, 0]}>
@@ -536,9 +627,8 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       ))}
 
       {/* the top landing: a stone ring the seal lies on */}
-      <mesh position={[0, -0.2 - STEP_THICK / 2, 0]}>
+      <mesh position={[0, -0.2 - STEP_THICK / 2, 0]} material={landingMat}>
         <cylinderGeometry args={[RING_R + 0.15, RING_R + 0.15, STEP_THICK * 1.5, 64]} />
-        <meshStandardMaterial color={STONE} map={stoneLanding} roughness={0.95} />
       </mesh>
       <points position={[0, -0.2, 0]}>
         <bufferGeometry>
@@ -565,7 +655,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       {/* runes carved down the pillar and into the treads */}
       <group ref={pillarRuneGroup}>
         {pillarRunes.map((pr, i) => (
-          <sprite key={i} position={[pr.x, pr.y, pr.z]} scale={[0.42, 0.42, 1]}>
+          <sprite key={i} position={[pr.x, pr.y, pr.z]} scale={[0.26, 0.26, 1]}>
             <spriteMaterial map={pr.tex} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
           </sprite>
         ))}
@@ -588,6 +678,10 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
             <mesh position={[0.1, -0.24, 0]} rotation={[0, 0, 0.35]} material={ironMat}>
               <cylinderGeometry args={[0.025, 0.035, 0.42, 6]} />
             </mesh>
+            {/* a cone of torchlight falling on the steps below */}
+            <mesh position={[-0.5, -1.1, 0]} rotation={[0, 0, 0.5]} material={coneMat}>
+              <coneGeometry args={[1.1, 2.4, 20, 1, true]} />
+            </mesh>
             {tk.niche && (
               <>
                 <mesh position={[0.22, 0.1, 0]} rotation={[0, Math.PI / 2, 0]} material={stoneMat}>
@@ -603,9 +697,8 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       </group>
 
       {/* the floor of the well */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -DEPTH - 0.55, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -DEPTH - 0.55, 0]} material={floorMat}>
         <circleGeometry args={[WALL_R, 64]} />
-        <meshStandardMaterial color={STONE_DARK} map={stoneFloor} roughness={1} />
       </mesh>
       <mesh ref={floor} rotation={[-Math.PI / 2, 0, 0]} position={[0, -DEPTH - 0.5, 0]}>
         <ringGeometry args={[PILLAR_R + 0.2, RING_R * 0.9, 96]} />
@@ -639,7 +732,7 @@ export default function RuneRing({ driver, className = "" }: { driver: React.Ref
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
         style={{ background: "transparent" }}
       >
-        <fog attach="fog" args={["#07080a", 2.5, 14]} />
+        <fog attach="fog" args={["#07080a", 3, 19]} />
         <Well driver={driver} />
       </Canvas>
     </div>
