@@ -17,7 +17,11 @@ const LANDINGS: { id: string; u: number; screen?: boolean }[] = [
   { id: "projects", u: 0.63 },
   { id: "contact", u: 0.97 },
 ];
-const WALK_VH = 1.7; // viewport-heights of scroll per walk between landings
+/* Scroll per walk between landings, in viewport heights: a base plus an
+   amount per turn of stair, so a long stretch takes longer than a short one. */
+const WALK_BASE_VH = 1.4;
+const WALK_PER_TURN_VH = 1.25;
+const STAIR_TURNS = 8; // keep in step with TURNS in RuneRing
 
 /* WebGL only exists in the browser; keep it out of the server render. */
 const RuneRing = dynamic(() => import("../components/RuneRing"), { ssr: false });
@@ -427,8 +431,10 @@ export default function Home() {
       segs.push({ start: pos, end: pos + hold, hold: true, i, from: l.u, to: l.u, travel });
       pos += hold;
       if (i < LANDINGS.length - 1) {
-        segs.push({ start: pos, end: pos + WALK_VH, hold: false, i, from: l.u, to: LANDINGS[i + 1].u, travel });
-        pos += WALK_VH;
+        const turns = (LANDINGS[i + 1].u - l.u) * STAIR_TURNS;
+        const walk = WALK_BASE_VH + WALK_PER_TURN_VH * turns;
+        segs.push({ start: pos, end: pos + walk, hold: false, i, from: l.u, to: LANDINGS[i + 1].u, travel });
+        pos += walk;
       }
     });
     timeline.current = segs;
