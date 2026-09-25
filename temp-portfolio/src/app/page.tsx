@@ -471,11 +471,13 @@ export default function Home() {
       // step onto the stair in the first part of the walk, then descend on it
       const hf = Math.min(1, frac * 1.6);
       d.hero = seg.i === 0 ? hf * hf * (3 - 2 * hf) : 1;
+      // hand over, don't cross-fade: the quest you leave is gone in the first
+      // third of the walk, the next one only shows once it is out of the way
       const leaving = d.panels[seg.i];
-      leaving.fade = seg.i === 0 ? 1 - Math.min(1, frac * 2.2) : 1;
+      leaving.fade = 1 - Math.min(1, frac / 0.3);
       leaving.shift = seg.travel;
       const arriving = d.panels[seg.i + 1];
-      arriving.fade = 1;
+      arriving.fade = Math.min(1, Math.max(0, (frac - 0.35) / 0.3));
       arriving.shift = 0;
     }
     const dep = Math.round(d.u * STEPS);

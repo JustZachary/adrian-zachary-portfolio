@@ -50,8 +50,8 @@ export const STEPS = Math.round(TURNS * STEPS_PER_TURN);
 const WEDGE = (Math.PI * 2) / STEPS_PER_TURN;
 const STEP_THICK = 0.16;
 const WALK_R = (RING_R + PILLAR_R) / 2 + 0.3;  // where you walk
-const EYE = 1.4;                                // eye height above the tread
-const AHEAD = 0.85;                             // radians you look ahead
+const EYE = 1.62;                               // eye height above the tread
+const AHEAD = 1.05;                             // radians you look ahead
 const GATE_A = -WEDGE * 2.2;                    // where the entrance is, just above step 0
 
 /* Shared driver state — written by the page every scroll, read every
@@ -132,8 +132,8 @@ function makeRuneTexture(rune: string) {
    with recessed mortar — becomes a colour map, a normal map (Sobel) and
    a roughness map, so torchlight actually rakes across the stone. */
 function makeStoneMaps() {
-  const size = 512;
-  const grid = 24;
+  const size = 1024;
+  const grid = 48;
   const rnd = (x: number, y: number) => {
     const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
     return n - Math.floor(n);
@@ -148,6 +148,7 @@ function makeStoneMaps() {
   const tone = new Float32Array(size * size);
   const course = size / 4;           // 4 courses per tile
   const block = size / 2;            // 2 blocks per course
+  const M = size / 512;              // mortar and pit scale follow the resolution
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const row = Math.floor(y / course);
@@ -156,12 +157,12 @@ function makeStoneMaps() {
       // mortar: a soft groove along block edges
       const ex = Math.min(bx, 1 - bx) * block, ey = Math.min(by, 1 - by) * course;
       const edge = Math.min(ex, ey);
-      const mortar = 1 - Math.min(1, edge / 9);
+      const mortar = 1 - Math.min(1, edge / (9 * M));
       const bId = Math.floor((x + off) / block) + row * 7;
       const bt = 0.75 + rnd(bId, 3) * 0.5;      // each block its own tone
       let n = 0, amp = 0.5, f = grid / size;
       for (let o = 0; o < 4; o++) { n += noise(x * f, y * f) * amp; amp *= 0.5; f *= 2; }
-      const pits = Math.pow(noise(x * 0.09, y * 0.09), 6) * 0.6;
+      const pits = Math.pow(noise(x * 0.09 / M, y * 0.09 / M), 6) * 0.6;
       const h = (1 - mortar * 0.9) * (0.55 + n * 0.45) - pits;
       height[y * size + x] = h;
       tone[y * size + x] = bt * (0.6 + n * 0.5) * (1 - mortar * 0.55);
@@ -180,7 +181,7 @@ function makeStoneMaps() {
       const t = tone[y * size + x];
       const warm = 0.9 + rnd(x, y) * 0.1;
       iCol.data[i] = base[0] * t * warm; iCol.data[i + 1] = base[1] * t; iCol.data[i + 2] = base[2] * t * (2 - warm); iCol.data[i + 3] = 255;
-      const dx = (at(x + 1, y) - at(x - 1, y)) * 3.5, dy = (at(x, y + 1) - at(x, y - 1)) * 3.5;
+      const dx = (at(x + 1, y) - at(x - 1, y)) * 3.5 * M, dy = (at(x, y + 1) - at(x, y - 1)) * 3.5 * M;
       const len = Math.hypot(dx, dy, 1);
       iNor.data[i] = ((-dx / len) * 0.5 + 0.5) * 255; iNor.data[i + 1] = ((-dy / len) * 0.5 + 0.5) * 255; iNor.data[i + 2] = (1 / len * 0.5 + 0.5) * 255; iNor.data[i + 3] = 255;
       const r = 0.7 + (1 - height[y * size + x]) * 0.3;
@@ -314,7 +315,7 @@ function poseAt(u: number, hero: number, mx: number, my: number, eye: THREE.Vect
   const wr = WALK_R;
   const wy = treadY(u) + STEP_THICK / 2 + EYE;
   const wLookDa = AHEAD, wLookR = WALK_R;
-  const wLookY = treadY(u + AHEAD / (TURNS * Math.PI * 2)) + STEP_THICK / 2 + EYE - 0.35;
+  const wLookY = treadY(u + AHEAD / (TURNS * Math.PI * 2)) + STEP_THICK / 2 + EYE - 0.05;
   // in the gate: at the threshold, high, looking across the seal into the well
   const ga = GATE_A;
   const gr = WALL_R - 0.6;
@@ -336,7 +337,7 @@ function poseAt(u: number, hero: number, mx: number, my: number, eye: THREE.Vect
    when you stand there, so it sits centre-screen while you read. */
 export function anchorAt(u: number, out: THREE.Vector3) {
   const a = angleAt(u) + AHEAD;
-  out.set(Math.cos(a) * WALK_R, treadY(u + AHEAD / (TURNS * Math.PI * 2)) + STEP_THICK / 2 + EYE - 0.35, Math.sin(a) * WALK_R);
+  out.set(Math.cos(a) * WALK_R, treadY(u + AHEAD / (TURNS * Math.PI * 2)) + STEP_THICK / 2 + EYE - 0.05, Math.sin(a) * WALK_R);
   return out;
 }
 
@@ -392,6 +393,17 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
     g.rotateX(-Math.PI / 2);          // shape plane → the tread's top
     g.translate(0, -STEP_THICK / 2 + 0.025, 0);
     g.computeVertexNormals();
+    // ambient occlusion, baked: darker where the tread meets the pillar and underneath
+    const pos = g.attributes.position;
+    const col = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      const r = Math.hypot(x, z);
+      const toPillar = Math.min(1, Math.max(0, (r - PILLAR_R) / 0.7));
+      const ao = (0.62 + 0.38 * toPillar * toPillar) * (y < -0.02 ? 0.55 : 1);
+      col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = ao;
+    }
+    g.setAttribute("color", new THREE.BufferAttribute(col, 3));
     return g;
   }, []);
   const nosingGeo = useMemo(() => new THREE.BoxGeometry(RING_R - PILLAR_R + 0.05, 0.008, 0.012), []);
@@ -399,20 +411,22 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const dirtGeo = useMemo(() => new THREE.PlaneGeometry(0.7, 0.45), []);
   const postGeo = useMemo(() => new THREE.CylinderGeometry(0.035, 0.045, 0.95, 6), []);
   const corbelGeo = useMemo(() => new THREE.BoxGeometry(0.34, 0.26, 0.3), []);
-  const stepMat = useMemo(() => stoneMaterial(tiledStone(maps, 0.55, 0.55), STONE_LIGHT, { emissive: "#2a2012", emissiveIntensity: 0.3 }), [maps]);
+  const stepMat = useMemo(() => stoneMaterial(tiledStone(maps, 0.55, 0.55), STONE_LIGHT, { emissive: "#2a2012", emissiveIntensity: 0.25, vertexColors: true }), [maps]);
   const brassMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#a8813f", roughness: 0.35, metalness: 0.9, envMapIntensity: 0.9 }), []);
   const dirtMat = useMemo(() => new THREE.MeshBasicMaterial({ map: blob, color: "#14110c", transparent: true, opacity: 0.55, depthWrite: false }), [blob]);
   const brassInst = useRef<THREE.InstancedMesh>(null);
   const dirtInst = useRef<THREE.InstancedMesh>(null);
   const DIRT = 160;
   const stoneMat = useMemo(() => stoneMaterial(tiledStone(maps, 0.6, 0.6), STONE), [maps]);
-  const coneMat = useMemo(() => new THREE.MeshBasicMaterial({ color: EMBER, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), []);
+  const coneMat = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.035, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), []);
+  const coneColor = useMemo(() => new THREE.Color(), []);
   const ironMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5a4a38", roughness: 0.38, metalness: 0.85, envMapIntensity: 0.6 }), []);
   const shadowGeo = useMemo(() => new THREE.CylinderGeometry(RING_R + 0.08, RING_R + 0.08, 0.01, 6, 1, false, Math.PI / 2 - WEDGE * 0.55, WEDGE * 1.1), []);
   const shadowMat = useMemo(() => new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.42, depthWrite: false }), []);
   const shadowInst = useRef<THREE.InstancedMesh>(null);
   // dark soot: normal blending of a near-black blob reads the same as multiply, without the premultiplied-alpha requirement
   const grimeMat = useMemo(() => new THREE.SpriteMaterial({ map: blob, color: "#0b0a07", transparent: true, opacity: 0.5, depthWrite: false }), [blob]);
+  const mossMat = useMemo(() => new THREE.SpriteMaterial({ map: blob, color: "#1c2a14", transparent: true, opacity: 0.55, depthWrite: false }), [blob]);
   /* Damp patches and soot on the wall, denser lower down. */
   const grime = useMemo(() => Array.from({ length: 90 }, () => {
     const u = Math.pow(Math.random(), 0.7);
@@ -607,10 +621,11 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
 
     // first person
     poseAt(u, s.hero, s.mx * look, s.my * look, eye, aim);
-    eye.y += Math.sin(u * STEPS * Math.PI) * 0.018 * s.hero;
+    eye.y += Math.sin(u * STEPS * Math.PI) * 0.018 * s.hero + Math.sin(t * 0.9) * 0.012;
+    aim.x += Math.sin(t * 0.5) * 0.02; aim.y += Math.cos(t * 0.7) * 0.015;
     state.camera.position.copy(eye);
     state.camera.lookAt(aim);
-    if (lamp.current) { lamp.current.position.copy(eye).add(tmp.set(0, 0.2, 0)); lamp.current.intensity = 14 + 22 * s.hero; }
+    if (lamp.current) { lamp.current.position.copy(eye).add(tmp.set(0, 0.35, 0)); lamp.current.intensity = 8 + 18 * s.hero; }
 
     // the portcullis lifts as you step through
     if (portcullis.current) portcullis.current.position.y = 0.25 + s.hero * 2.2;
@@ -672,6 +687,16 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
         if (dist < bestD) { second = best; secondD = bestD; bestD = dist; best = i; }
         else if (dist < secondD) { secondD = dist; second = i; }
       });
+      // a cone you are standing in would fill the screen with haze: fade the near ones out
+      if (coneInst.current) {
+        torchGroup.current.children.forEach((m, i) => {
+          m.getWorldPosition(tmp);
+          const dist = tmp.distanceTo(cam.position);
+          const vis = Math.min(1, Math.max(0, (dist - 2.2) / 2.5));
+          coneInst.current!.setColorAt(i, coneColor.copy(EMBER).multiplyScalar(vis));
+        });
+        coneInst.current.instanceColor!.needsUpdate = true;
+      }
       torchGroup.current.children[best].getWorldPosition(tmp);
       torchLight.current.position.copy(tmp);
       const fl = (sd: number) => 0.94 + 0.03 * Math.sin(t * 3.1 + sd) + 0.02 * Math.sin(t * 7.3 + sd * 2) + 0.01 * Math.sin(t * 13 + sd * 3);
@@ -746,7 +771,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   return (
     <>
       <ambientLight color="#7a6650" intensity={0.55} />
-      <hemisphereLight args={["#5a4830", "#0a0806", 0.7]} />
+      <hemisphereLight args={["#2c3140", "#0a0806", 0.75]} />
       {/* physically-based lights: candela-ish, so they need to be strong */}
       <pointLight ref={lamp} color="#f0d6ac" intensity={36} distance={12} decay={2} />
       <pointLight ref={torchLight} color="#ffb068" intensity={70} distance={11} decay={2} />
@@ -923,7 +948,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
         </bufferGeometry>
       </points>
       {grime.map((g, i) => (
-        <sprite key={i} position={[g.x, g.y, g.z]} scale={[g.s, g.s * 0.7, 1]} material={grimeMat} />
+        <sprite key={i} position={[g.x, g.y, g.z]} scale={[g.s, g.s * 0.7, 1]} material={i % 3 === 0 ? mossMat : grimeMat} />
       ))}
 
       <points ref={embers}>
