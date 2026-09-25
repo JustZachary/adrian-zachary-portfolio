@@ -219,7 +219,13 @@ function stoneGen(kind: StoneKind, size: number, seed: number) {
         const corner = Math.max(0, 1 - Math.hypot(ex, ey) / (34 * (size / 512)));
         if (corner > 0 && pr(faceId, 7, 997, 9) < 0.45) mortar = Math.max(mortar, corner * corner * 0.8);
         tone = 0.78 + pr(faceId, 1, 997, 2) * 0.44;
-        if (kind === "ashlar") tilt = ((pr(faceId, 2, 997, 4) - 0.5) * (lu - 0.5) + (pr(faceId, 3, 997, 6) - 0.5) * (lv - 0.5)) * 0.35;
+        if (kind === "ashlar") {
+          tilt = ((pr(faceId, 2, 997, 4) - 0.5) * (lu - 0.5) + (pr(faceId, 3, 997, 6) - 0.5) * (lv - 0.5)) * 0.35;
+          // each stone stands a little proud or sits a little back; a few are gone
+          const r = pr(faceId, 8, 997, 12);
+          tilt += r < 0.06 ? -0.45 : r < 0.3 ? -0.08 : r > 0.82 ? 0.14 : 0;
+          if (r < 0.06) tone *= 0.55;
+        }
       } else {
         // flagstones: irregular cells, mortar along the borders
         const w = worley(u, v, 3, 17);
@@ -451,7 +457,54 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const flag = useMemo(() => makeStoneMaps("flag", 1024, 2), []);
   const drum = useMemo(() => makeStoneMaps("drum", 768, 3), []);
   // one tile ≈ 2 world units, so texel density is even across surfaces
-  const wallMat = useMemo(() => stoneMaterial(tiledStone(ashlar, 13, 23), STONE_DARK, { side: THREE.BackSide }), [ashlar]);
+  /* A low-frequency mottle laid over the wall as an ambient-occlusion map,
+     so the tile's repeat is broken by broad light and dark patches. */
+  const mottle = useMemo(() => {
+    const size = 256;
+    const data = new Uint8Array(size * size * 4);
+    const rnd = (x: number, y: number) => { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); };
+    const sm = (t: number) => t * t * (3 - 2 * t);
+    const noise = (x: number, y: number, per: number) => {
+      const xi = Math.floor(x), yi = Math.floor(y), xf = sm(x - xi), yf = sm(y - yi);
+      const w = (a: number, b: number) => rnd(((a % per) + per) % per, ((b % per) + per) % per);
+      const a = w(xi, yi), b = w(xi + 1, yi), c = w(xi, yi + 1), d = w(xi + 1, yi + 1);
+      return a + (b - a) * xf + (c - a) * yf + (a - b - c + d) * xf * yf;
+    };
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const u = x / size, v = y / size;
+      const n = 0.5 * noise(u * 4, v * 4, 4) + 0.3 * noise(u * 8, v * 8, 8) + 0.2 * noise(u * 16, v * 16, 16);
+      const val = (0.55 + n * 0.5) * 255;
+      const i = (y * size + x) * 4;
+      data[i] = data[i + 1] = data[i + 2] = val; data[i + 3] = 255;
+    }
+    const t = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(3, 4);
+    t.channel = 0;
+    t.needsUpdate = true;
+    return t;
+  }, []);
+  const wallMat = useMemo(() => stoneMaterial(tiledStone(ashlar, 9, 16), STONE_DARK, { side: THREE.BackSide, aoMap: mottle, aoMapIntensity: 0.9, normalScale: new THREE.Vector2(1.3, 1.3), vertexColors: true }), [ashlar, mottle]);
+  /* The shaft wall itself carries baked shade: darker toward the floor
+     and into the vault, and in the corners beside each pilaster. */
+  const wallGeo = useMemo(() => {
+    const g = new THREE.CylinderGeometry(WALL_R, WALL_R, DEPTH + 8, 96, 24, true);
+    const pos = g.attributes.position;
+    const col = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      const a = Math.atan2(z, x);
+      const yy = y + (-DEPTH / 2 + 0.5); // world y of this vertex (the mesh is placed at that offset)
+      const floorShade = Math.min(1, Math.max(0, (yy + DEPTH + 0.5) / 2.5));      // dark in the last 2.5 units
+      const vaultShade = Math.min(1, Math.max(0, (4.2 - yy) / 2));                // dark toward the vault
+      let pilaster = 1;
+      for (let k = 0; k < 8; k++) { const pa = (k / 8) * Math.PI * 2 + Math.PI / 8; const d = Math.abs(Math.atan2(Math.sin(a - pa), Math.cos(a - pa))); pilaster = Math.min(pilaster, 0.6 + 0.4 * Math.min(1, d / 0.22)); }
+      const v = (0.35 + 0.65 * floorShade) * (0.5 + 0.5 * vaultShade) * pilaster;
+      col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v;
+    }
+    g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    return g;
+  }, []);
   const pillarMat = useMemo(() => stoneMaterial(tiledStone(drum, 2.5, 23), STONE_LIGHT), [drum]);
   const floorMat = useMemo(() => stoneMaterial(tiledStone(flag, 4, 4), STONE_DARK), [flag]);
   const landingMat = useMemo(() => stoneMaterial(tiledStone(flag, 0.5, 0.5), STONE), [flag]);
@@ -512,7 +565,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const brassInst = useRef<THREE.InstancedMesh>(null);
   const dirtInst = useRef<THREE.InstancedMesh>(null);
   const DIRT = 160;
-  const stoneMat = useMemo(() => stoneMaterial(tiledStone(ashlar, 0.6, 0.6), STONE), [ashlar]);
+  const stoneMat = useMemo(() => stoneMaterial(tiledStone(ashlar, 0.45, 0.45), STONE), [ashlar]);
 
   const ironMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5a4a38", roughness: 0.38, metalness: 0.85, envMapIntensity: 0.6 }), []);
   const shadowGeo = useMemo(() => new THREE.CylinderGeometry(RING_R + 0.08, RING_R + 0.08, 0.01, 6, 1, false, Math.PI / 2 - WEDGE * 0.55, WEDGE * 1.1), []);
@@ -520,6 +573,8 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const shadowInst = useRef<THREE.InstancedMesh>(null);
   // dark soot: normal blending of a near-black blob reads the same as multiply, without the premultiplied-alpha requirement
   const grimeMat = useMemo(() => new THREE.SpriteMaterial({ map: blob, color: "#0b0a07", transparent: true, opacity: 0.5, depthWrite: false }), [blob]);
+  const sootMat = useMemo(() => new THREE.SpriteMaterial({ map: blob, color: "#050403", transparent: true, opacity: 0.85, depthWrite: false }), [blob]);
+  const dripMat = useMemo(() => new THREE.SpriteMaterial({ map: blob, color: "#0d0b08", transparent: true, opacity: 0.5, depthWrite: false }), [blob]);
   const mossMat = useMemo(() => new THREE.SpriteMaterial({ map: blob, color: "#1c2a14", transparent: true, opacity: 0.55, depthWrite: false }), [blob]);
   /* Damp patches and soot on the wall, denser lower down. */
   const grime = useMemo(() => Array.from({ length: 48 }, () => {
@@ -877,9 +932,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       <pointLight ref={torchLight2} color="#ffb068" intensity={45} distance={10} decay={2} />
 
       {/* the shaft wall, seen from inside, the vault over it and a cornice */}
-      <mesh position={[0, -DEPTH / 2 + 0.5, 0]} material={wallMat}>
-        <cylinderGeometry args={[WALL_R, WALL_R, DEPTH + 8, 64, 1, true]} />
-      </mesh>
+      <mesh position={[0, -DEPTH / 2 + 0.5, 0]} material={wallMat} geometry={wallGeo} />
       <mesh position={[0, 4.5, 0]} material={wallMat}>
         <sphereGeometry args={[WALL_R, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
       </mesh>
@@ -1041,6 +1094,14 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
           <bufferAttribute attach="attributes-position" args={[smoke.pos, 3]} />
         </bufferGeometry>
       </points>
+      {/* soot plumes above the torches, drip stains under the niche sills */}
+      {torches.map((tk, i) => (
+        <group key={"soot" + i}>
+          <sprite position={[tk.x * 0.985, tk.y + 0.85, tk.z * 0.985]} scale={[1.1, 1.6, 1]} material={sootMat} />
+          <sprite position={[tk.x * 0.985, tk.y + 1.7, tk.z * 0.985]} scale={[0.8, 1.2, 1]} material={sootMat} />
+          {tk.niche && <sprite position={[tk.x * 0.985, tk.y - 1.15, tk.z * 0.985]} scale={[0.7, 1.3, 1]} material={dripMat} />}
+        </group>
+      ))}
       {grime.map((g, i) => (
         <sprite key={i} position={[g.x, g.y, g.z]} scale={[g.s, g.s * 0.7, 1]} material={i % 3 === 0 ? mossMat : grimeMat} />
       ))}
