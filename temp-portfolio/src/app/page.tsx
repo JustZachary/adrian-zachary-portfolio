@@ -6,6 +6,7 @@ import AskTheCodex from "../components/AskTheCodex";
 import { PROJECTS } from "../data/projects";
 import type { Project } from "../data/projects";
 import { SmoothScroll, SplitReveal, Magnetic, scrollToY } from "../components/motion";
+import { STEPS } from "../components/RuneRing";
 import type { RingDriver } from "../components/RuneRing";
 
 /* Where each section hangs on the stair (0 = the gate, 1 = the floor),
@@ -433,11 +434,12 @@ export default function Home() {
   const panelRefs = useRef<(HTMLDivElement | null)[]>([]);
   const ringDriver = useRef<RingDriver>({
     u: 0, hero: 0, hold: 1, mouseX: 0, mouseY: 0,
-    panels: LANDINGS.map((l) => ({ el: null, u: l.u, screen: l.screen, shift: 0, fade: l.screen ? 1 : 0 })),
+    panels: LANDINGS.map((l) => ({ el: null, h: 0, u: l.u, screen: l.screen, shift: 0, fade: l.screen ? 1 : 0 })),
   });
   const timeline = useRef<{ start: number; end: number; hold: boolean; i: number; from: number; to: number; travel: number }[]>([]);
   const [totalVh, setTotalVh] = useState(900);
-  const [depth, setDepth] = useState(0);
+  const depthEl = useRef<HTMLSpanElement>(null);
+  const lastDepth = useRef(-1);
 
   const buildTimeline = () => {
     const vh = window.innerHeight;
@@ -445,6 +447,7 @@ export default function Home() {
     let pos = 0;
     LANDINGS.forEach((l, i) => {
       const h = panelRefs.current[i]?.offsetHeight ?? vh;
+      ringDriver.current.panels[i].h = h;
       const travel = Math.max(0, h - vh * 0.78); // px the panel must scroll while you read
       const hold = 0.9 + travel / vh;              // in viewport heights
       segs.push({ start: pos, end: pos + hold, hold: true, i, from: l.u, to: l.u, travel });
@@ -482,7 +485,7 @@ export default function Home() {
       const p = d.panels[seg.i];
       p.fade = 1;
       p.shift = frac * seg.travel;
-      if (d.panels[seg.i + 1]) d.panels[seg.i + 1].fade = 1;
+      if (d.panels[seg.i + 1]) d.panels[seg.i + 1].fade = 0.55;
     } else {
       const e = frac * frac * (3 - 2 * frac);
       d.u = seg.from + (seg.to - seg.from) * e;
@@ -495,8 +498,8 @@ export default function Home() {
       arriving.fade = 1;
       arriving.shift = 0;
     }
-    const dep = Math.round(d.u * 104);
-    setDepth((prev) => (prev === dep ? prev : dep));
+    const dep = Math.round(d.u * STEPS);
+    if (dep !== lastDepth.current && depthEl.current) { lastDepth.current = dep; depthEl.current.textContent = String(dep); }
   });
 
   /* Nav: a landing's id scrolls to where you stand at it; an anchor
@@ -546,16 +549,15 @@ export default function Home() {
         .font-crimson { font-family: 'Crimson Text', serif; }
         .quest {
           position: fixed; left: 0; top: 0; opacity: 0; pointer-events: none;
-          will-change: transform, opacity; transform-origin: 50% 50%;
+          transform-origin: 50% 50%; backface-visibility: hidden;
         }
         .quest-hero { width: min(96vw, 1100px); }
         .quest-panel {
           width: min(92vw, 1120px);
-          background: rgba(10,10,8,0.66);
+          background: rgba(10,10,8,0.8);
           border: 1px solid rgba(246,188,124,0.18);
           border-radius: 22px;
           box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 40px 120px rgba(0,0,0,0.65), 0 0 90px rgba(246,188,124,0.05), inset 0 0 60px rgba(0,0,0,0.35);
-          backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
         }
         .quest-panel::before, .quest-panel::after {
           content: 'ᚦ'; position: absolute; top: 14px; font-family: serif; font-size: 14px;
@@ -563,16 +565,17 @@ export default function Home() {
         }
         .quest-panel::before { left: 18px; }
         .quest-panel::after { right: 18px; content: 'ᛟ'; }
-        @keyframes torchlight {
-          0%, 100% { opacity: 0.55; } 18% { opacity: 0.7; } 37% { opacity: 0.5; } 61% { opacity: 0.75; } 80% { opacity: 0.58; }
-        }
         .torchlight {
           position: fixed; inset: 0; pointer-events: none; z-index: 30;
+          background: radial-gradient(ellipse 70% 60% at 50% 50%, transparent 40%, rgba(0,0,0,0.72) 100%);
+        }
+        @keyframes emberglow { 0%, 100% { opacity: 0.6; } 50% { opacity: 0.85; } }
+        .torchlight::after {
+          content: ''; position: absolute; inset: 0;
           background:
-            radial-gradient(ellipse 70% 60% at 50% 50%, transparent 40%, rgba(0,0,0,0.78) 100%),
-            radial-gradient(ellipse 30% 40% at 0% 60%, rgba(255,140,60,0.10), transparent 70%),
-            radial-gradient(ellipse 30% 40% at 100% 35%, rgba(255,140,60,0.08), transparent 70%);
-          animation: torchlight 4.5s ease-in-out infinite;
+            radial-gradient(ellipse 30% 40% at 0% 60%, rgba(255,140,60,0.09), transparent 70%),
+            radial-gradient(ellipse 30% 40% at 100% 35%, rgba(255,140,60,0.07), transparent 70%);
+          animation: emberglow 7s ease-in-out infinite;
         }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: var(--bg-deep); }
@@ -606,7 +609,7 @@ export default function Home() {
         <div className="torchlight" />
         {/* depth meter */}
         <motion.div className="fixed bottom-5 left-5 z-40 font-cinzel text-[10px] tracking-[0.35em] uppercase select-none" style={{ color: "rgba(246,188,124,0.6)", textShadow: "0 0 12px rgba(246,188,124,0.4)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }}>
-          <span className="opacity-60" style={{ fontFamily: "serif" }}>ᛞ </span>Depth · {depth} steps
+          <span className="opacity-60" style={{ fontFamily: "serif" }}>ᛞ </span>Depth · <span ref={depthEl}>0</span> steps
         </motion.div>
 
         {/* NAVBAR */}
@@ -693,9 +696,9 @@ export default function Home() {
         {/* THE QUESTS — fixed panels the stair positions every frame (see RuneRing).
             Nothing here is in the document flow; the spacer below gives the
             page its scroll length and useDescent turns scroll into the walk. */}
-        <div className="fixed inset-0 z-10 pointer-events-none" style={{ perspective: "1200px" }}>
+        <div className="fixed inset-0 z-10 pointer-events-none">
           <div ref={(el) => { panelRefs.current[0] = el; ringDriver.current.panels[0].el = el; }} className="quest quest-hero">
-            <div className="absolute inset-0 pointer-events-none -z-10" style={{ background: "radial-gradient(ellipse 60% 55% at 50% 50%, rgba(7,8,10,0.55) 0%, transparent 70%)" }} />
+            <div className="absolute -inset-10 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 58% at 50% 50%, rgba(7,8,10,0.78) 0%, rgba(7,8,10,0.45) 55%, transparent 100%)" }} />
             <div className="relative flex flex-col items-center text-center">
 
 
@@ -747,7 +750,7 @@ export default function Home() {
             </div>
           </div>
           <div ref={(el) => { panelRefs.current[1] = el; ringDriver.current.panels[1].el = el; }} className="quest quest-panel">
-            <p className="font-cinzel text-[10px] uppercase tracking-[0.45em] text-center mb-2 -mt-6" style={{ color: "rgba(246,188,124,0.5)" }}>Landing II · The Engineer · {Math.round(LANDINGS[1].u * 104)} steps down</p>
+            <p className="font-cinzel text-[10px] uppercase tracking-[0.45em] text-center mb-2 -mt-6" style={{ color: "rgba(246,188,124,0.5)" }}>Landing II · The Engineer · {Math.round(LANDINGS[1].u * STEPS)} steps down</p>
             <section id="about" className="px-6 md:px-12 py-16 md:py-20 relative overflow-hidden">
               <div className="absolute right-10 top-1/2 -translate-y-1/2 text-[200px] select-none pointer-events-none opacity-[0.03] font-cinzel" style={{ color: "#F6BC7C" }}>⚜</div>
               <div className="max-w-4xl mx-auto relative z-10">
@@ -780,7 +783,7 @@ export default function Home() {
             </section>
           </div>
           <div ref={(el) => { panelRefs.current[2] = el; ringDriver.current.panels[2].el = el; }} className="quest quest-panel">
-            <p className="font-cinzel text-[10px] uppercase tracking-[0.45em] text-center mb-2 -mt-6" style={{ color: "rgba(246,188,124,0.5)" }}>Landing III · The Arsenal · {Math.round(LANDINGS[2].u * 104)} steps down</p>
+            <p className="font-cinzel text-[10px] uppercase tracking-[0.45em] text-center mb-2 -mt-6" style={{ color: "rgba(246,188,124,0.5)" }}>Landing III · The Arsenal · {Math.round(LANDINGS[2].u * STEPS)} steps down</p>
             <section id="skills" className="px-6 md:px-12 py-16 md:py-20 relative">
               <div className="max-w-6xl mx-auto">
                 <Reveal>
@@ -802,7 +805,7 @@ export default function Home() {
             </section>
           </div>
           <div ref={(el) => { panelRefs.current[3] = el; ringDriver.current.panels[3].el = el; }} className="quest quest-panel">
-            <p className="font-cinzel text-[10px] uppercase tracking-[0.45em] text-center mb-2 -mt-6" style={{ color: "rgba(246,188,124,0.5)" }}>Landing IV · The Chronicles · {Math.round(LANDINGS[3].u * 104)} steps down</p>
+            <p className="font-cinzel text-[10px] uppercase tracking-[0.45em] text-center mb-2 -mt-6" style={{ color: "rgba(246,188,124,0.5)" }}>Landing IV · The Chronicles · {Math.round(LANDINGS[3].u * STEPS)} steps down</p>
             <section id="projects" className="px-6 md:px-12 py-16 md:py-20 relative">
               <div className="max-w-6xl mx-auto">
                 <Reveal>
@@ -822,7 +825,7 @@ export default function Home() {
             </section>
           </div>
           <div ref={(el) => { panelRefs.current[4] = el; ringDriver.current.panels[4].el = el; }} className="quest quest-panel">
-            <p className="font-cinzel text-[10px] uppercase tracking-[0.45em] text-center mb-2 -mt-6" style={{ color: "rgba(246,188,124,0.5)" }}>Landing V · The Floor · {Math.round(LANDINGS[4].u * 104)} steps down</p>
+            <p className="font-cinzel text-[10px] uppercase tracking-[0.45em] text-center mb-2 -mt-6" style={{ color: "rgba(246,188,124,0.5)" }}>Landing V · The Floor · {Math.round(LANDINGS[4].u * STEPS)} steps down</p>
             <section id="contact" className="px-6 md:px-12 py-16 md:py-20 relative overflow-hidden">
               <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 60% at 50% 50%, rgba(246,188,124,0.04) 0%, transparent 70%)" }} />
               <Reveal>
