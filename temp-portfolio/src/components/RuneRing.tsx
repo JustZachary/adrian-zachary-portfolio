@@ -656,6 +656,8 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   useEffect(() => { sealShader.uniforms.uPixelRatio.value = gl.getPixelRatio(); }, [gl, sealShader]);
 
   const smooth = useRef({ mx: 0, my: 0, u: 0, hero: 0, hold: 0 });
+  const litTorch = useRef({ a: -1, b: -1, ia: 0, ib: 0 });
+  const lightTarget = useMemo(() => [new THREE.Vector3(), new THREE.Vector3()], []);
   const tmp = useMemo(() => new THREE.Vector3(), []);
   const eye = useMemo(() => new THREE.Vector3(), []);
   const aim = useMemo(() => new THREE.Vector3(), []);
@@ -733,7 +735,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       let best = 0, bestD = Infinity, second = 0, secondD = Infinity;
       torchGroup.current.children.forEach((m, i) => {
         const tk = torches[i];
-        const flicker = 0.88 + 0.08 * Math.sin(t * 5 + tk.seed) + 0.04 * Math.sin(t * 11 + tk.seed * 2);
+        const flicker = 0.92 + 0.05 * Math.sin(t * 5 + tk.seed) + 0.03 * Math.sin(t * 11 + tk.seed * 2);
         const sp = m.children[0] as THREE.Sprite | undefined;
         if (sp) { sp.material.opacity = 0.9 * flicker; sp.scale.setScalar(0.6 + 0.06 * flicker); }
         const inner = m.children[1] as THREE.Sprite | undefined, outer = m.children[2] as THREE.Sprite | undefined;
@@ -759,14 +761,27 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
         });
         coneInst.current.instanceColor!.needsUpdate = true;
       }
-      torchGroup.current.children[best].getWorldPosition(tmp);
-      torchLight.current.position.copy(tmp);
       const fl = (sd: number) => 0.94 + 0.03 * Math.sin(t * 3.1 + sd) + 0.02 * Math.sin(t * 7.3 + sd * 2) + 0.01 * Math.sin(t * 13 + sd * 3);
       const calm = 0.5 + 0.5 * s.hero; // the gate is lit softly; the stair by torchlight
-      torchLight.current.intensity = 70 * fl(torches[best].seed) * calm;
-      torchGroup.current.children[second].getWorldPosition(tmp);
-      torchLight2.current.position.copy(tmp);
-      torchLight2.current.intensity = 45 * fl(torches[second].seed) * calm;
+      // the lit pair is chosen with hysteresis, so two torches at equal
+      // distance don't trade places every frame, and the lights ease over
+      const lt = litTorch.current;
+      const distTo = (i: number) => { torchGroup.current!.children[i].getWorldPosition(tmp); return tmp.distanceTo(cam.position); };
+      if (lt.a < 0) { lt.a = best; lt.b = second; }
+      else {
+        const da = distTo(lt.a), db = distTo(lt.b);
+        if (best !== lt.a && best !== lt.b && bestD < Math.max(da, db) - 0.6) { if (da > db) lt.a = best; else lt.b = best; }
+        else if (second !== lt.a && second !== lt.b && secondD < Math.max(da, db) - 0.6) { if (da > db) lt.a = second; else lt.b = second; }
+      }
+      const kl = 1 - Math.exp(-dt * 6);
+      torchGroup.current.children[lt.a].getWorldPosition(lightTarget[0]);
+      torchGroup.current.children[lt.b].getWorldPosition(lightTarget[1]);
+      torchLight.current.position.lerp(lightTarget[0], kl);
+      torchLight2.current.position.lerp(lightTarget[1], kl);
+      lt.ia += (70 * fl(torches[lt.a].seed) * calm - lt.ia) * kl;
+      lt.ib += (45 * fl(torches[lt.b].seed) * calm - lt.ib) * kl;
+      torchLight.current.intensity = lt.ia;
+      torchLight2.current.intensity = lt.ib;
     }
 
     // light runs down the stair, step by step; the step you're on is lit
@@ -897,7 +912,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
           ))}
         </group>
         {/* the threshold and the bridge to the landing */}
-        <mesh position={[-0.75, 0, 0]} material={stoneMat}><boxGeometry args={[1.5, STEP_THICK * 1.5, 2.4]} /></mesh>
+        <mesh position={[-0.35, 0.02, 0]} material={stoneMat}><boxGeometry args={[0.7, STEP_THICK * 1.5, 2.4]} /></mesh>
         <mesh position={[-0.95, 0.01, -1.1]} material={ironMat}><boxGeometry args={[1.5, 0.04, 0.04]} /></mesh>
         <mesh position={[-0.95, 0.01, 1.1]} material={ironMat}><boxGeometry args={[1.5, 0.04, 0.04]} /></mesh>
       </group>
