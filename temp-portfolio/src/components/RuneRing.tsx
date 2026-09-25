@@ -480,7 +480,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const dirtInst = useRef<THREE.InstancedMesh>(null);
   const DIRT = 160;
   const stoneMat = useMemo(() => stoneMaterial(tiledStone(ashlar, 0.6, 0.6), STONE), [ashlar]);
-  const coneMat = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.035, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), []);
+  const coneMat = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.045, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide }), []);
   const coneColor = useMemo(() => new THREE.Color(), []);
   const ironMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5a4a38", roughness: 0.38, metalness: 0.85, envMapIntensity: 0.6 }), []);
   const shadowGeo = useMemo(() => new THREE.CylinderGeometry(RING_R + 0.08, RING_R + 0.08, 0.01, 6, 1, false, Math.PI / 2 - WEDGE * 0.55, WEDGE * 1.1), []);
@@ -490,10 +490,10 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const grimeMat = useMemo(() => new THREE.SpriteMaterial({ map: blob, color: "#0b0a07", transparent: true, opacity: 0.5, depthWrite: false }), [blob]);
   const mossMat = useMemo(() => new THREE.SpriteMaterial({ map: blob, color: "#1c2a14", transparent: true, opacity: 0.55, depthWrite: false }), [blob]);
   /* Damp patches and soot on the wall, denser lower down. */
-  const grime = useMemo(() => Array.from({ length: 90 }, () => {
+  const grime = useMemo(() => Array.from({ length: 48 }, () => {
     const u = Math.pow(Math.random(), 0.7);
     const a = Math.random() * Math.PI * 2;
-    return { x: Math.cos(a) * (WALL_R - 0.06), y: treadY(u) + (Math.random() - 0.3) * 3, z: Math.sin(a) * (WALL_R - 0.06), s: 1.2 + Math.random() * 2.2 };
+    return { x: Math.cos(a) * (WALL_R - 0.06), y: treadY(u) + (Math.random() - 0.3) * 3, z: Math.sin(a) * (WALL_R - 0.06), s: 0.9 + Math.random() * 1.5 };
   }), []);
 
   const railGeo = useMemo(() => new THREE.TubeGeometry(new HelixCurve(RING_R - 0.14, STEP_THICK / 2 + 0.95), STEPS * 4, 0.035, 8, false), []);
@@ -600,7 +600,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const archInst = useRef<THREE.InstancedMesh>(null);
   const sillInst = useRef<THREE.InstancedMesh>(null);
   const bracketGeo = useMemo(() => new THREE.CylinderGeometry(0.025, 0.035, 0.42, 6), []);
-  const coneGeo = useMemo(() => new THREE.ConeGeometry(1.1, 2.4, 20, 1, true), []);
+  const coneGeo = useMemo(() => new THREE.ConeGeometry(1.1, 2.4, 12, 1, true), []);
   const archGeo = useMemo(() => new THREE.TorusGeometry(0.42, 0.07, 8, 24, Math.PI), []);
   const sillGeo = useMemo(() => new THREE.BoxGeometry(0.98, 0.1, 0.14), []);
   const nicheCount = useMemo(() => torches.filter((t) => t.niche).length, [torches]);
@@ -1040,7 +1040,7 @@ export default function RuneRing({ driver, className = "" }: { driver: React.Ref
   return (
     <div className={`absolute inset-0 ${className}`} aria-hidden>
       <Canvas
-        dpr={[1, 1.5]}
+        dpr={[1, 1.25]}
         camera={{ position: [2.4, 2.9, 1.0], fov: 60, near: 0.05, far: 40 }}
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance", toneMappingExposure: 0.8 }}
         style={{ background: "transparent" }}

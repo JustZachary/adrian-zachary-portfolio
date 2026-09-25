@@ -537,7 +537,8 @@ export default function Home() {
         .font-crimson { font-family: 'Crimson Text', serif; }
         .quest {
           position: fixed; left: 0; top: 0; opacity: 0; pointer-events: none;
-          transform-origin: 50% 50%; backface-visibility: hidden;
+          transform-origin: 50% 50%; backface-visibility: hidden; isolation: isolate; contain: paint;
+          will-change: transform, opacity;
         }
         .quest-hero { width: min(96vw, 1100px); }
         .quest-panel {
@@ -686,12 +687,12 @@ export default function Home() {
             page its scroll length and useDescent turns scroll into the walk. */}
         <div className="fixed inset-0 z-10 pointer-events-none">
           <div ref={(el) => { panelRefs.current[0] = el; ringDriver.current.panels[0].el = el; }} className="quest quest-hero">
-            <div className="absolute -inset-10 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 58% at 50% 50%, rgba(7,8,10,0.78) 0%, rgba(7,8,10,0.45) 55%, transparent 100%)" }} />
+            <div className="absolute -inset-6 md:-inset-10 rounded-[28px] pointer-events-none" style={{ background: "rgba(7,8,10,0.6)", border: "1px solid rgba(246,188,124,0.12)" }} />
             <div className="relative flex flex-col items-center text-center">
 
 
           <motion.div className="relative mb-8" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.2 }}>
-            <div className="absolute -inset-4 rounded-3xl blur-2xl" style={{ background: "radial-gradient(ellipse, rgba(246,188,124,0.2), transparent 70%)" }} />
+            <div className="absolute inset-0 rounded-3xl" style={{ boxShadow: "0 0 70px 18px rgba(246,188,124,0.16)" }} />
             <div className="absolute -inset-1 rounded-3xl border border-[#F6BC7C]/30" />
             <div className="absolute -inset-3 rounded-3xl border border-[#F6BC7C]/10" />
             <img src="/my_picture2.jpeg" alt="Adrian Zachary" className="relative rounded-3xl h-[260px] object-cover" style={{ filter: "contrast(1.05) saturate(0.9)" }} />
@@ -703,7 +704,7 @@ export default function Home() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
             <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.5em] text-xs mb-4 opacity-80">⚜ Code ⚜ Cloud ⚜ AI ⚜ Systems ⚜</p>
             <p className="font-cinzel text-[var(--silver)] text-xs uppercase tracking-[0.4em] mb-3 opacity-50">Software Engineer · Cloud Architect Apprentice</p>
-            <SplitReveal text="Adrian Zachary bin Ian" className="font-cinzel text-3xl md:text-7xl font-bold leading-tight mb-3 text-white" style={{ textShadow: "0 0 40px rgba(246,188,124,0.35), 0 0 80px rgba(246,188,124,0.1)", perspective: "600px" }} delay={0.5} stagger={0.12} />
+            <SplitReveal text="Adrian Zachary bin Ian" className="font-cinzel text-3xl md:text-7xl font-bold leading-tight mb-3 text-white" style={{ textShadow: "0 2px 14px rgba(0,0,0,0.7), 0 0 18px rgba(246,188,124,0.25)" }} delay={0.5} stagger={0.12} />
             <p className="font-cinzel text-[#F6BC7C] text-2xl md:text-3xl font-semibold mb-6 tracking-widest opacity-70">· &quot;Z&quot; ·</p>
           </motion.div>
 
@@ -723,7 +724,7 @@ export default function Home() {
           <motion.div className="flex gap-6 md:gap-10 text-center flex-wrap justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }}>
             {[["2+", "Major Projects"], ["1", "Enterprise Internship"], ["AWS", "Certification In Progress"]].map(([val, label]) => (
               <div key={label}>
-                <h3 className="font-cinzel text-3xl font-bold text-[#F6BC7C]" style={{ textShadow: "0 0 20px rgba(246,188,124,0.4)" }}>{val}</h3>
+                <h3 className="font-cinzel text-3xl font-bold text-[#F6BC7C]" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}>{val}</h3>
                 <p className="font-crimson text-sm" style={{ color: "var(--text-dim)" }}>{label}</p>
               </div>
             ))}
