@@ -467,7 +467,9 @@ export default function Home() {
       const e = frac * frac * (3 - 2 * frac);
       d.u = seg.from + (seg.to - seg.from) * e;
       d.hold = 0;
-      d.hero = seg.i === 0 ? e : 1;
+      // step onto the stair in the first part of the walk, then descend on it
+      const hf = Math.min(1, frac * 1.6);
+      d.hero = seg.i === 0 ? hf * hf * (3 - 2 * hf) : 1;
       const leaving = d.panels[seg.i];
       leaving.fade = seg.i === 0 ? 1 - Math.min(1, frac * 2.2) : 1;
       leaving.shift = seg.travel;
