@@ -25,6 +25,7 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 
 const GOLD = new THREE.Color("#F6BC7C");
 const SILVER = new THREE.Color("#D9EAFA");
@@ -83,6 +84,25 @@ function makeGlowTexture() {
   g.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/* A soft irregular blob: damp patches on the wall, smoke, flame bodies. */
+function makeBlobTexture() {
+  const size = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d")!;
+  for (let i = 0; i < 9; i++) {
+    const x = size / 2 + (Math.random() - 0.5) * 40, y = size / 2 + (Math.random() - 0.5) * 40, r = 22 + Math.random() * 26;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, "rgba(255,255,255,0.55)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -182,7 +202,7 @@ function tiledStone(src: StoneMaps, rx: number, ry: number): StoneMaps {
   return { map: c(src.map), normalMap: c(src.normalMap), roughnessMap: c(src.roughnessMap) };
 }
 function stoneMaterial(maps: StoneMaps, color: string, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) {
-  return new THREE.MeshStandardMaterial({ color, map: maps.map, normalMap: maps.normalMap, normalScale: new THREE.Vector2(1.1, 1.1), roughnessMap: maps.roughnessMap, roughness: 1, metalness: 0.02, ...extra });
+  return new THREE.MeshStandardMaterial({ color, map: maps.map, normalMap: maps.normalMap, normalScale: new THREE.Vector2(1.2, 1.2), roughnessMap: maps.roughnessMap, roughness: 1, metalness: 0.02, envMapIntensity: 0.35, ...extra });
 }
 
 /* (kept for the landing collar and small parts) */
@@ -316,6 +336,16 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const portcullis = useRef<THREE.Group>(null);
 
   const glow = useMemo(() => makeGlowTexture(), []);
+  const blob = useMemo(() => makeBlobTexture(), []);
+  const { scene, gl: renderer } = useThree();
+  /* A neutral room environment so iron and wet stone have something to reflect. */
+  useEffect(() => {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = env;
+    scene.environmentIntensity = 0.22;
+    return () => { scene.environment = null; env.dispose(); pmrem.dispose(); };
+  }, [scene, renderer]);
   const stone = useMemo(() => makeStoneTexture(), []);
   const maps = useMemo(() => makeStoneMaps(), []);
   // one tile ≈ 2 world units, so texel density is even across surfaces
@@ -336,7 +366,19 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const stepMat = useMemo(() => stoneMaterial(tiledStone(maps, 1.2, 0.5), STONE_LIGHT, { emissive: "#2a2012", emissiveIntensity: 0.35 }), [maps]);
   const stoneMat = useMemo(() => stoneMaterial(tiledStone(maps, 0.6, 0.6), STONE), [maps]);
   const coneMat = useMemo(() => new THREE.MeshBasicMaterial({ color: EMBER, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), []);
-  const ironMat = useMemo(() => new THREE.MeshStandardMaterial({ color: IRON, roughness: 0.45, metalness: 0.7, emissive: "#2a1c0a", emissiveIntensity: 0.25 }), []);
+  const ironMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5a4a38", roughness: 0.38, metalness: 0.85, envMapIntensity: 0.6 }), []);
+  const shadowGeo = useMemo(() => new THREE.CylinderGeometry(RING_R + 0.08, RING_R + 0.08, 0.01, 6, 1, false, Math.PI / 2 - WEDGE * 0.55, WEDGE * 1.1), []);
+  const shadowMat = useMemo(() => new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.42, depthWrite: false }), []);
+  const shadowInst = useRef<THREE.InstancedMesh>(null);
+  // dark soot: normal blending of a near-black blob reads the same as multiply, without the premultiplied-alpha requirement
+  const grimeMat = useMemo(() => new THREE.SpriteMaterial({ map: blob, color: "#0b0a07", transparent: true, opacity: 0.5, depthWrite: false }), [blob]);
+  /* Damp patches and soot on the wall, denser lower down. */
+  const grime = useMemo(() => Array.from({ length: 90 }, () => {
+    const u = Math.pow(Math.random(), 0.7);
+    const a = Math.random() * Math.PI * 2;
+    return { x: Math.cos(a) * (WALL_R - 0.06), y: treadY(u) + (Math.random() - 0.3) * 3, z: Math.sin(a) * (WALL_R - 0.06), s: 1.2 + Math.random() * 2.2 };
+  }), []);
+
   const railGeo = useMemo(() => new THREE.TubeGeometry(new HelixCurve(RING_R - 0.14, STEP_THICK / 2 + 0.95), STEPS * 4, 0.035, 8, false), []);
   const railGeo2 = useMemo(() => new THREE.TubeGeometry(new HelixCurve(RING_R - 0.14, STEP_THICK / 2 + 0.5), STEPS * 4, 0.018, 6, false), []);
 
@@ -367,6 +409,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
     place(nosingInst.current, (RING_R + PILLAR_R) / 2, STEP_THICK / 2, 0, -WEDGE * 0.48);
     place(corbelInst.current, RING_R - 0.25, -STEP_THICK / 2 - 0.13, 0);
     place(postInst.current, RING_R - 0.14, STEP_THICK / 2 + 0.47, 0);
+    place(shadowInst.current, 0, -STEP_THICK / 2 - 0.012, 0);
     if (nosingInst.current) { for (let k = 0; k < STEPS; k++) nosingInst.current.setColorAt(k, GOLD); nosingInst.current.instanceColor!.needsUpdate = true; }
   }, [steps]);
 
@@ -437,6 +480,18 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
     set(sillInst.current, "niche", 0.22, -0.55, 0, 0, Math.PI / 2, 0);
   }, [torches]);
 
+  /* Smoke: a few particles per torch, rising and fading, recycled. */
+  const SMOKE_PER = 4;
+  const smokeRef = useRef<THREE.Points>(null);
+  const smoke = useMemo(() => {
+    const n = torches.length * SMOKE_PER;
+    const pos = new Float32Array(n * 3);
+    const life = new Float32Array(n);
+    for (let i = 0; i < n; i++) life[i] = Math.random();
+    return { pos, life, n };
+  }, [torches]);
+  const smokeMat = useMemo(() => new THREE.PointsMaterial({ map: blob, color: "#3a332c", size: 0.55, sizeAttenuation: true, transparent: true, opacity: 0.35, depthWrite: false }), [blob]);
+
   const pilasters = useMemo(() => Array.from({ length: 8 }, (_, i) => (i / 8) * Math.PI * 2 + Math.PI / 8), []);
   const wisps = useMemo(() => Array.from({ length: 7 }, (_, i) => ({ off: i / 7, seed: Math.random() * 10, speed: 0.008 + Math.random() * 0.006 })), []);
 
@@ -504,7 +559,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       const topCentre = NAV + 28 + h / 2;
       if (p.screen) {
         const cy = tall ? topCentre : size.height / 2;
-        p.el.style.transform = `translate(${size.width / 2}px, ${cy - p.shift}px) translate(-50%, -50%)`;
+        p.el.style.transform = `translate(${Math.round(size.width / 2)}px, ${Math.round(cy - p.shift)}px) translate(-50%, -50%)`;
         p.el.style.opacity = String(p.fade);
         p.el.style.pointerEvents = p.fade > 0.5 ? "auto" : "none";
         continue;
@@ -522,7 +577,8 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       const op = behind ? 0 : near * p.fade;
       const w = tall ? Math.min(1, Math.max(0, (scale - 0.8) / 0.2)) : 0;
       const cy = sy * (1 - w) + topCentre * w;
-      p.el.style.transform = `translate(${sx}px, ${cy - p.shift}px) translate(-50%, -50%) scale(${scale})`;
+      const sc = scale > 0.995 ? 1 : scale;
+      p.el.style.transform = `translate(${Math.round(sx)}px, ${Math.round(cy - p.shift)}px) translate(-50%, -50%) scale(${sc.toFixed(3)})`;
       p.el.style.opacity = String(op);
       p.el.style.pointerEvents = op > 0.6 && scale > 0.9 ? "auto" : "none";
     }
@@ -535,6 +591,14 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
         const flicker = 0.88 + 0.08 * Math.sin(t * 5 + tk.seed) + 0.04 * Math.sin(t * 11 + tk.seed * 2);
         const sp = m.children[0] as THREE.Sprite | undefined;
         if (sp) { sp.material.opacity = 0.9 * flicker; sp.scale.setScalar(0.6 + 0.06 * flicker); }
+        const inner = m.children[1] as THREE.Sprite | undefined, outer = m.children[2] as THREE.Sprite | undefined;
+        if (inner && outer) {
+          const lick = Math.sin(t * 17 + tk.seed * 3) * 0.5 + Math.sin(t * 9.3 + tk.seed) * 0.5;
+          inner.scale.set(0.2 + 0.03 * lick, 0.38 + 0.08 * lick, 1);
+          inner.position.x = 0.02 * lick;
+          outer.scale.set(0.32 + 0.05 * lick, 0.55 + 0.12 * Math.sin(t * 7 + tk.seed), 1);
+          outer.material.opacity = 0.5 + 0.15 * lick;
+        }
         m.getWorldPosition(tmp);
         const dist = tmp.distanceTo(cam.position);
         if (dist < bestD) { second = best; secondD = bestD; bestD = dist; best = i; }
@@ -583,6 +647,20 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       pillarRuneGroup.current.children.forEach((m, i) => {
         (m as THREE.Sprite).material.opacity = 0.55 + 0.35 * Math.sin(t * 1.3 + pillarRunes[i].seed);
       });
+    }
+    if (smokeRef.current) {
+      const { pos, life, n } = smoke;
+      for (let i = 0; i < n; i++) {
+        life[i] += dt * 0.22;
+        if (life[i] > 1) life[i] -= 1;
+        const tk = torches[Math.floor(i / SMOKE_PER)];
+        const l = life[i];
+        const drift = Math.sin(t * 0.8 + i) * 0.12 * l;
+        pos[i * 3] = tk.x * 0.94 + drift;
+        pos[i * 3 + 1] = tk.y + 0.25 + l * 1.6;
+        pos[i * 3 + 2] = tk.z * 0.94 + Math.cos(t * 0.7 + i * 1.7) * 0.12 * l;
+      }
+      smokeRef.current.geometry.attributes.position.needsUpdate = true;
     }
     if (embers.current) {
       embers.current.rotation.y = t * 0.02;
@@ -710,6 +788,8 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       <instancedMesh ref={nosingInst} args={[nosingGeo, nosingMat, STEPS]} frustumCulled={false} />
       <instancedMesh ref={corbelInst} args={[corbelGeo, stoneMat, STEPS]} frustumCulled={false} />
       <instancedMesh ref={postInst} args={[postGeo, ironMat, STEPS]} frustumCulled={false} />
+      {/* a dark wedge just under each tread: the shadow it throws on the step below */}
+      <instancedMesh ref={shadowInst} args={[shadowGeo, shadowMat, STEPS]} frustumCulled={false} />
       <mesh geometry={railGeo} material={ironMat} />
       <mesh geometry={railGeo2} material={ironMat} />
 
@@ -736,6 +816,12 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
             <sprite scale={[0.6, 0.6, 1]}>
               <spriteMaterial map={glow} color={EMBER} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
             </sprite>
+            <sprite scale={[0.22, 0.42, 1]} position={[0, 0.08, 0]}>
+              <spriteMaterial map={blob} color="#ffd27a" transparent depthWrite={false} blending={THREE.AdditiveBlending} />
+            </sprite>
+            <sprite scale={[0.34, 0.6, 1]} position={[0, 0.16, 0]}>
+              <spriteMaterial map={blob} color="#ff7a1a" transparent opacity={0.6} depthWrite={false} blending={THREE.AdditiveBlending} />
+            </sprite>
           </group>
         ))}
       </group>
@@ -760,6 +846,15 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
           </sprite>
         ))}
       </group>
+
+      <points ref={smokeRef} material={smokeMat}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[smoke.pos, 3]} />
+        </bufferGeometry>
+      </points>
+      {grime.map((g, i) => (
+        <sprite key={i} position={[g.x, g.y, g.z]} scale={[g.s, g.s * 0.7, 1]} material={grimeMat} />
+      ))}
 
       <points ref={embers}>
         <bufferGeometry>

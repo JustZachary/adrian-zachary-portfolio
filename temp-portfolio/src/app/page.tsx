@@ -484,7 +484,7 @@ export default function Home() {
       const p = d.panels[seg.i];
       p.fade = 1;
       p.shift = frac * seg.travel;
-      if (d.panels[seg.i + 1]) d.panels[seg.i + 1].fade = 1;
+      if (d.panels[seg.i + 1]) d.panels[seg.i + 1].fade = 0.55;
     } else {
       const e = frac * frac * (3 - 2 * frac);
       d.u = seg.from + (seg.to - seg.from) * e;
@@ -548,7 +548,7 @@ export default function Home() {
         .font-crimson { font-family: 'Crimson Text', serif; }
         .quest {
           position: fixed; left: 0; top: 0; opacity: 0; pointer-events: none;
-          will-change: transform, opacity; transform-origin: 50% 50%;
+          transform-origin: 50% 50%; backface-visibility: hidden;
         }
         .quest-hero { width: min(96vw, 1100px); }
         .quest-panel {
@@ -695,9 +695,9 @@ export default function Home() {
         {/* THE QUESTS — fixed panels the stair positions every frame (see RuneRing).
             Nothing here is in the document flow; the spacer below gives the
             page its scroll length and useDescent turns scroll into the walk. */}
-        <div className="fixed inset-0 z-10 pointer-events-none" style={{ perspective: "1200px" }}>
+        <div className="fixed inset-0 z-10 pointer-events-none">
           <div ref={(el) => { panelRefs.current[0] = el; ringDriver.current.panels[0].el = el; }} className="quest quest-hero">
-            <div className="absolute -inset-10 pointer-events-none -z-10" style={{ background: "radial-gradient(ellipse 60% 58% at 50% 50%, rgba(7,8,10,0.78) 0%, rgba(7,8,10,0.45) 55%, transparent 100%)" }} />
+            <div className="absolute -inset-10 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 58% at 50% 50%, rgba(7,8,10,0.78) 0%, rgba(7,8,10,0.45) 55%, transparent 100%)" }} />
             <div className="relative flex flex-col items-center text-center">
 
 
