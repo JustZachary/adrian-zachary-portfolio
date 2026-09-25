@@ -1,4 +1,8 @@
 "use client";
+/* eslint-disable react-hooks/purity, react-hooks/immutability --
+   this file is a three.js render loop: it seeds geometry with random
+   numbers once and mutates its own typed-array buffers every frame,
+   which is how WebGL scenes work, not a React state bug. */
 /* The page IS a spiral stair in an underground well.
  *
  * You arrive through a gated archway at the top — the dungeon entrance —
@@ -33,7 +37,6 @@ const EMBER = new THREE.Color("#ff9a3c");
 const STONE = "#7a6d55";
 const STONE_LIGHT = "#948468";
 const STONE_DARK = "#5e5446";
-const IRON = "#4a3d2e";
 const RUNES = ["ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚱ", "ᚲ", "ᚷ", "ᚹ", "ᚺ", "ᚾ", "ᛁ", "ᛃ", "ᛇ", "ᛈ", "ᛉ", "ᛊ", "ᛏ", "ᛒ", "ᛖ", "ᛗ", "ᛚ", "ᛜ", "ᛞ", "ᛟ"];
 
 /* The well's shape. */
@@ -196,7 +199,7 @@ function makeStoneMaps() {
   };
   return { map: tex(cCol, true), normalMap: tex(cNor, false), roughnessMap: tex(cRgh, false) };
 }
-type StoneMaps = ReturnType<typeof makeStoneMaps>;
+type StoneMaps = { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: THREE.Texture };
 function tiledStone(src: StoneMaps, rx: number, ry: number): StoneMaps {
   const c = (t: THREE.Texture) => { const k = t.clone(); k.repeat.set(rx, ry); k.needsUpdate = true; return k; };
   return { map: c(src.map), normalMap: c(src.normalMap), roughnessMap: c(src.roughnessMap) };

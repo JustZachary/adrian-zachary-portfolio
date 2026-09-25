@@ -264,31 +264,6 @@ function PortalIntro({ onEnter }: { onEnter: () => void }) {
   );
 }
 
-/* Between sections: a rune line, and below it how far down the stair
-   this landing is. */
-function RuneDivider({ landing, steps }: { landing?: string; steps?: number }) {
-  return (
-    <div className="relative z-10 flex flex-col items-center justify-center gap-2 py-6">
-      <div className="flex items-center justify-center gap-4 opacity-30">
-        <div className="h-px flex-1 w-[100px]" style={{ background: "linear-gradient(to right, transparent, #F6BC7C)" }} />
-        <span className="text-[#F6BC7C] text-xs tracking-widest" style={{ fontFamily: "serif" }}>ᚠ ᚱ ᚹ ᛖ ᛚ ᛟ</span>
-        <div className="h-px flex-1 w-[100px]" style={{ background: "linear-gradient(to left, transparent, #F6BC7C)" }} />
-      </div>
-      {landing && (
-        <motion.p
-          className="font-cinzel text-[10px] uppercase tracking-[0.45em]"
-          style={{ color: "rgba(246,188,124,0.45)" }}
-          initial={{ opacity: 0, y: 8 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
-        >
-          Landing {landing}{steps ? ` · ${steps} steps down` : ""}
-        </motion.p>
-      )}
-    </div>
-  );
-}
 
 function ArcaneCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
@@ -446,7 +421,7 @@ export default function Home() {
     let pos = 0;
     LANDINGS.forEach((l, i) => {
       const h = panelRefs.current[i]?.offsetHeight ?? vh;
-      ringDriver.current.panels[i].h = h;
+      ringDriver.current.panels[i].h = h; // eslint-disable-line react-hooks/immutability -- ref, read by the canvas
       const travel = Math.max(0, h - vh * 0.78); // px the panel must scroll while you read
       const hold = 0.9 + travel / vh;              // in viewport heights
       segs.push({ start: pos, end: pos + hold, hold: true, i, from: l.u, to: l.u, travel });
@@ -460,13 +435,16 @@ export default function Home() {
     setTotalVh(Math.round(pos * 100) + 100);
   };
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the spacer height comes from measuring the mounted panels
     buildTimeline();
     const t = setTimeout(buildTimeline, 800); // fonts and images settle
     window.addEventListener("resize", buildTimeline);
     return () => { clearTimeout(t); window.removeEventListener("resize", buildTimeline); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const { scrollY } = useScroll();
+  /* eslint-disable react-hooks/immutability -- everything written here goes
+     into ringDriver (a ref the canvas reads per frame), never into state */
   useMotionValueEvent(scrollY, "change", (v) => {
     const vh = window.innerHeight;
     const pos = v / vh;
@@ -500,6 +478,7 @@ export default function Home() {
     const dep = Math.round(d.u * STEPS);
     if (dep !== lastDepth.current && depthEl.current) { lastDepth.current = dep; depthEl.current.textContent = String(dep); }
   });
+  /* eslint-enable react-hooks/immutability */
 
   /* Nav: a landing's id scrolls to where you stand at it; an anchor
      inside a panel scrolls to where that part of the panel is in view. */
@@ -607,7 +586,7 @@ export default function Home() {
         </motion.div>
         <div className="torchlight" />
         {/* depth meter */}
-        <motion.div className="fixed bottom-5 left-5 z-40 font-cinzel text-[10px] tracking-[0.35em] uppercase select-none" style={{ color: "rgba(246,188,124,0.6)", textShadow: "0 0 12px rgba(246,188,124,0.4)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }}>
+        <motion.div className="fixed top-[72px] md:top-[80px] left-4 md:left-6 z-40 font-cinzel text-[10px] tracking-[0.35em] uppercase select-none pointer-events-none" style={{ color: "rgba(246,188,124,0.6)", textShadow: "0 0 12px rgba(246,188,124,0.4)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }}>
           <span className="opacity-60" style={{ fontFamily: "serif" }}>ᛞ </span>Depth · <span ref={depthEl}>0</span> steps
         </motion.div>
 
