@@ -25,6 +25,8 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Scrolling is eased by Lenis (src/components/motion.tsx); native
+   smooth-scroll on top of it makes anchors stutter. */
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }

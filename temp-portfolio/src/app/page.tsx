@@ -1,9 +1,26 @@
 "use client";
-import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import AskTheCodex from "../components/AskTheCodex";
 import { PROJECTS } from "../data/projects";
 import type { Project } from "../data/projects";
+import { SmoothScroll, SplitReveal, Magnetic, scrollToY } from "../components/motion";
+import type { RingDriver } from "../components/RuneRing";
+
+/* Where each section hangs on the stair (0 = the gate, 1 = the floor),
+   and how much stair you walk between them. */
+const LANDINGS: { id: string; u: number; screen?: boolean }[] = [
+  { id: "home", u: 0, screen: true },
+  { id: "about", u: 0.17 },
+  { id: "skills", u: 0.4 },
+  { id: "projects", u: 0.63 },
+  { id: "contact", u: 0.97 },
+];
+const WALK_VH = 1.7; // viewport-heights of scroll per walk between landings
+
+/* WebGL only exists in the browser; keep it out of the server render. */
+const RuneRing = dynamic(() => import("../components/RuneRing"), { ssr: false });
 
 const RUNES = ["ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚱ", "ᚲ", "ᚷ", "ᚹ", "ᚺ", "ᚾ", "ᛁ", "ᛃ", "ᛇ", "ᛈ", "ᛉ", "ᛊ", "ᛏ", "ᛒ", "ᛖ", "ᛗ", "ᛚ", "ᛜ", "ᛞ", "ᛟ"];
 
@@ -247,12 +264,28 @@ function PortalIntro({ onEnter }: { onEnter: () => void }) {
   );
 }
 
-function RuneDivider() {
+/* Between sections: a rune line, and below it how far down the stair
+   this landing is. */
+function RuneDivider({ landing, steps }: { landing?: string; steps?: number }) {
   return (
-    <div className="flex items-center justify-center gap-4 py-4 opacity-30">
-      <div className="h-px flex-1 max-w-[100px]" style={{ background: "linear-gradient(to right, transparent, #F6BC7C)" }} />
-      <span className="text-[#F6BC7C] text-xs tracking-widest" style={{ fontFamily: "serif" }}>ᚠ ᚱ ᚹ ᛖ ᛚ ᛟ</span>
-      <div className="h-px flex-1 max-w-[100px]" style={{ background: "linear-gradient(to left, transparent, #F6BC7C)" }} />
+    <div className="relative z-10 flex flex-col items-center justify-center gap-2 py-6">
+      <div className="flex items-center justify-center gap-4 opacity-30">
+        <div className="h-px flex-1 w-[100px]" style={{ background: "linear-gradient(to right, transparent, #F6BC7C)" }} />
+        <span className="text-[#F6BC7C] text-xs tracking-widest" style={{ fontFamily: "serif" }}>ᚠ ᚱ ᚹ ᛖ ᛚ ᛟ</span>
+        <div className="h-px flex-1 w-[100px]" style={{ background: "linear-gradient(to left, transparent, #F6BC7C)" }} />
+      </div>
+      {landing && (
+        <motion.p
+          className="font-cinzel text-[10px] uppercase tracking-[0.45em]"
+          style={{ color: "rgba(246,188,124,0.45)" }}
+          initial={{ opacity: 0, y: 8 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+        >
+          Landing {landing}{steps ? ` · ${steps} steps down` : ""}
+        </motion.p>
+      )}
     </div>
   );
 }
@@ -390,8 +423,105 @@ export default function Home() {
   const [entered, setEntered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  /* THE DESCENT.
+     The stair is one long walk from the gate to the floor; the sections
+     hang at landings along it. Scroll is turned into a timeline of holds
+     (standing at a landing, reading — long enough to scroll through a
+     tall panel) and walks (the stretch of stair to the next one). The
+     canvas gets `u` (where you are) and moves the panels itself; see
+     RuneRing. */
+  const panelRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const ringDriver = useRef<RingDriver>({
+    u: 0, hero: 0, hold: 1, mouseX: 0, mouseY: 0,
+    panels: LANDINGS.map((l) => ({ el: null, u: l.u, screen: l.screen, shift: 0, fade: l.screen ? 1 : 0 })),
+  });
+  const timeline = useRef<{ start: number; end: number; hold: boolean; i: number; from: number; to: number; travel: number }[]>([]);
+  const [totalVh, setTotalVh] = useState(900);
+  const [depth, setDepth] = useState(0);
+
+  const buildTimeline = () => {
+    const vh = window.innerHeight;
+    const segs: typeof timeline.current = [];
+    let pos = 0;
+    LANDINGS.forEach((l, i) => {
+      const h = panelRefs.current[i]?.offsetHeight ?? vh;
+      const travel = Math.max(0, h - vh * 0.78); // px the panel must scroll while you read
+      const hold = 0.9 + travel / vh;              // in viewport heights
+      segs.push({ start: pos, end: pos + hold, hold: true, i, from: l.u, to: l.u, travel });
+      pos += hold;
+      if (i < LANDINGS.length - 1) {
+        segs.push({ start: pos, end: pos + WALK_VH, hold: false, i, from: l.u, to: LANDINGS[i + 1].u, travel });
+        pos += WALK_VH;
+      }
+    });
+    timeline.current = segs;
+    setTotalVh(Math.round(pos * 100) + 100);
+  };
+  useEffect(() => {
+    buildTimeline();
+    const t = setTimeout(buildTimeline, 800); // fonts and images settle
+    window.addEventListener("resize", buildTimeline);
+    return () => { clearTimeout(t); window.removeEventListener("resize", buildTimeline); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const { scrollY } = useScroll();
+  useMotionValueEvent(scrollY, "change", (v) => {
+    const vh = window.innerHeight;
+    const pos = v / vh;
+    const d = ringDriver.current;
+    const segs = timeline.current;
+    if (!segs.length) return;
+    let seg = segs[segs.length - 1];
+    for (const sg of segs) if (pos < sg.end) { seg = sg; break; }
+    const frac = Math.min(1, Math.max(0, (pos - seg.start) / (seg.end - seg.start)));
+    for (const p of d.panels) { p.fade = 0; }
+    if (seg.hold) {
+      d.u = seg.from;
+      d.hold = 1;
+      d.hero = seg.i === 0 ? 0 : 1;
+      const p = d.panels[seg.i];
+      p.fade = 1;
+      p.shift = frac * seg.travel;
+      if (d.panels[seg.i + 1]) d.panels[seg.i + 1].fade = 1;
+    } else {
+      const e = frac * frac * (3 - 2 * frac);
+      d.u = seg.from + (seg.to - seg.from) * e;
+      d.hold = 0;
+      d.hero = seg.i === 0 ? e : 1;
+      const leaving = d.panels[seg.i];
+      leaving.fade = seg.i === 0 ? 1 - Math.min(1, frac * 2.2) : 1;
+      leaving.shift = seg.travel;
+      const arriving = d.panels[seg.i + 1];
+      arriving.fade = 1;
+      arriving.shift = 0;
+    }
+    const dep = Math.round(d.u * 104);
+    setDepth((prev) => (prev === dep ? prev : dep));
+  });
+
+  /* Nav: a landing's id scrolls to where you stand at it; an anchor
+     inside a panel scrolls to where that part of the panel is in view. */
   const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+    const vh = window.innerHeight;
+    const segs = timeline.current;
+    let li = LANDINGS.findIndex((l) => l.id === id);
+    let within = 0;
+    if (li < 0) {
+      const el = document.getElementById(id);
+      const panel = el?.closest(".quest") as HTMLElement | null;
+      if (!el || !panel) return;
+      li = panelRefs.current.indexOf(panel as HTMLDivElement);
+      within = el.getBoundingClientRect().top - panel.getBoundingClientRect().top - vh * 0.15;
+    }
+    const seg = segs.find((sg) => sg.hold && sg.i === li);
+    if (!seg) return;
+    const f = seg.travel > 0 ? Math.min(1, Math.max(0, within / seg.travel)) : 0;
+    scrollToY((seg.start + f * (seg.end - seg.start)) * vh + 2);
+  };
+
+  const onPageMouse = (e: React.MouseEvent) => {
+    ringDriver.current.mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+    ringDriver.current.mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
   };
 
   return (
@@ -414,6 +544,36 @@ export default function Home() {
         }
         .font-cinzel { font-family: 'Cinzel', serif; }
         .font-crimson { font-family: 'Crimson Text', serif; }
+        .quest {
+          position: fixed; left: 0; top: 0; opacity: 0; pointer-events: none;
+          will-change: transform, opacity; transform-origin: 50% 50%;
+        }
+        .quest-hero { width: min(96vw, 1100px); }
+        .quest-panel {
+          width: min(92vw, 1120px);
+          background: rgba(10,10,8,0.66);
+          border: 1px solid rgba(246,188,124,0.18);
+          border-radius: 22px;
+          box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 40px 120px rgba(0,0,0,0.65), 0 0 90px rgba(246,188,124,0.05), inset 0 0 60px rgba(0,0,0,0.35);
+          backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+        }
+        .quest-panel::before, .quest-panel::after {
+          content: 'ᚦ'; position: absolute; top: 14px; font-family: serif; font-size: 14px;
+          color: rgba(246,188,124,0.4); text-shadow: 0 0 10px rgba(246,188,124,0.5);
+        }
+        .quest-panel::before { left: 18px; }
+        .quest-panel::after { right: 18px; content: 'ᛟ'; }
+        @keyframes torchlight {
+          0%, 100% { opacity: 0.55; } 18% { opacity: 0.7; } 37% { opacity: 0.5; } 61% { opacity: 0.75; } 80% { opacity: 0.58; }
+        }
+        .torchlight {
+          position: fixed; inset: 0; pointer-events: none; z-index: 30;
+          background:
+            radial-gradient(ellipse 70% 60% at 50% 50%, transparent 40%, rgba(0,0,0,0.78) 100%),
+            radial-gradient(ellipse 30% 40% at 0% 60%, rgba(255,140,60,0.10), transparent 70%),
+            radial-gradient(ellipse 30% 40% at 100% 35%, rgba(255,140,60,0.08), transparent 70%);
+          animation: torchlight 4.5s ease-in-out infinite;
+        }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: var(--bg-deep); }
         ::-webkit-scrollbar-thumb { background: rgba(246,188,124,0.3); border-radius: 2px; }
@@ -430,13 +590,25 @@ export default function Home() {
       {/* Portal — rendered directly, NOT inside AnimatePresence */}
       {!entered && <PortalIntro onEnter={() => setEntered(true)} />}
 
+      <SmoothScroll>
       <motion.main
         initial={{ opacity: 0 }}
         animate={{ opacity: entered ? 1 : 0 }}
         transition={{ duration: 1, delay: 0.3 }}
-        className="min-h-screen"
+        className="min-h-screen relative"
         style={{ background: "var(--bg-deep)" }}
+        onMouseMove={onPageMouse}
       >
+        {/* The stair runs behind the whole page; scrolling is the descent */}
+        <motion.div className="fixed inset-0 z-0 pointer-events-none" initial={{ opacity: 0, scale: 1.15 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 2.2, ease: [0.22, 1, 0.36, 1] }}>
+          <RuneRing driver={ringDriver} />
+        </motion.div>
+        <div className="torchlight" />
+        {/* depth meter */}
+        <motion.div className="fixed bottom-5 left-5 z-40 font-cinzel text-[10px] tracking-[0.35em] uppercase select-none" style={{ color: "rgba(246,188,124,0.6)", textShadow: "0 0 12px rgba(246,188,124,0.4)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }}>
+          <span className="opacity-60" style={{ fontFamily: "serif" }}>ᛞ </span>Depth · {depth} steps
+        </motion.div>
+
         {/* NAVBAR */}
         <nav
           className="fixed top-0 w-full z-50 border-b border-[#F6BC7C]/10"
@@ -518,19 +690,14 @@ export default function Home() {
         </nav>
 
         {/* HERO */}
-        <section id="home" className="relative flex flex-col items-center justify-center text-center min-h-screen px-6 pt-28 overflow-hidden">
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgba(246,188,124,0.06) 0%, transparent 70%)" }} />
-            <div className="absolute bottom-0 left-0 right-0 h-64" style={{ background: "linear-gradient(to top, rgba(246,188,124,0.04) 0%, transparent 100%)" }} />
-            <div className="absolute top-0 left-0 w-96 h-96 blur-[100px] rounded-full" style={{ background: "rgba(246,188,124,0.05)" }} />
-            <div className="absolute bottom-0 right-0 w-96 h-96 blur-[100px] rounded-full" style={{ background: "rgba(217,234,250,0.03)" }} />
-          </div>
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden opacity-10">
-            {[300, 450, 600].map((size, i) => (
-              <motion.div key={i} className="absolute rounded-full border border-[#F6BC7C]" style={{ width: size, height: size }}
-                animate={{ rotate: i % 2 === 0 ? 360 : -360 }} transition={{ duration: 60 + i * 20, repeat: Infinity, ease: "linear" }} />
-            ))}
-          </div>
+        {/* THE QUESTS — fixed panels the stair positions every frame (see RuneRing).
+            Nothing here is in the document flow; the spacer below gives the
+            page its scroll length and useDescent turns scroll into the walk. */}
+        <div className="fixed inset-0 z-10 pointer-events-none" style={{ perspective: "1200px" }}>
+          <div ref={(el) => { panelRefs.current[0] = el; ringDriver.current.panels[0].el = el; }} className="quest quest-hero">
+            <div className="absolute inset-0 pointer-events-none -z-10" style={{ background: "radial-gradient(ellipse 60% 55% at 50% 50%, rgba(7,8,10,0.55) 0%, transparent 70%)" }} />
+            <div className="relative flex flex-col items-center text-center">
+
 
           <motion.div className="relative mb-8" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.2 }}>
             <div className="absolute -inset-4 rounded-3xl blur-2xl" style={{ background: "radial-gradient(ellipse, rgba(246,188,124,0.2), transparent 70%)" }} />
@@ -545,7 +712,7 @@ export default function Home() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
             <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.5em] text-xs mb-4 opacity-80">⚜ Code ⚜ Cloud ⚜ AI ⚜ Systems ⚜</p>
             <p className="font-cinzel text-[var(--silver)] text-xs uppercase tracking-[0.4em] mb-3 opacity-50">Software Engineer · Cloud Architect Apprentice</p>
-            <h1 className="font-cinzel text-3xl md:text-7xl font-bold leading-tight mb-3 text-white" style={{ textShadow: "0 0 40px rgba(246,188,124,0.35), 0 0 80px rgba(246,188,124,0.1)" }}>Adrian Zachary bin Ian</h1>
+            <SplitReveal text="Adrian Zachary bin Ian" className="font-cinzel text-3xl md:text-7xl font-bold leading-tight mb-3 text-white" style={{ textShadow: "0 0 40px rgba(246,188,124,0.35), 0 0 80px rgba(246,188,124,0.1)", perspective: "600px" }} delay={0.5} stagger={0.12} />
             <p className="font-cinzel text-[#F6BC7C] text-2xl md:text-3xl font-semibold mb-6 tracking-widest opacity-70">· &quot;Z&quot; ·</p>
           </motion.div>
 
@@ -554,12 +721,12 @@ export default function Home() {
           </motion.p>
 
           <motion.div className="flex gap-4 flex-wrap justify-center mb-14" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}>
-            <button onClick={() => scrollTo("projects")} className="font-cinzel text-sm tracking-widest px-7 py-3 relative group" style={{ background: "rgba(246,188,124,0.12)", border: "1px solid rgba(246,188,124,0.5)", color: "#F6BC7C", borderRadius: "2px" }}>
+            <Magnetic><button onClick={() => scrollTo("projects")} className="font-cinzel text-sm tracking-widest px-7 py-3 relative group" style={{ background: "rgba(246,188,124,0.12)", border: "1px solid rgba(246,188,124,0.5)", color: "#F6BC7C", borderRadius: "2px" }}>
               <span className="absolute top-0 left-0 w-2 h-2 border-t border-l border-[#F6BC7C]/60" /><span className="absolute top-0 right-0 w-2 h-2 border-t border-r border-[#F6BC7C]/60" /><span className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-[#F6BC7C]/60" /><span className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-[#F6BC7C]/60" />
               View Projects
-            </button>
-            <button onClick={() => scrollTo("contact")} className="font-cinzel text-sm tracking-widest px-7 py-3 transition-all duration-300 hover:bg-[#D9EAFA]/10" style={{ border: "1px solid rgba(217,234,250,0.25)", color: "rgba(217,234,250,0.8)", borderRadius: "2px" }}>Contact Me</button>
-            <a href="/adrian_zachary_resume.pdf" download className="font-cinzel text-sm tracking-widest px-7 py-3 transition-all duration-300 hover:bg-[#F6BC7C]/10" style={{ border: "1px solid rgba(246,188,124,0.25)", color: "rgba(246,188,124,0.7)", borderRadius: "2px" }}>Download Resume</a>
+            </button></Magnetic>
+            <Magnetic><button onClick={() => scrollTo("contact")} className="font-cinzel text-sm tracking-widest px-7 py-3 transition-all duration-300 hover:bg-[#D9EAFA]/10" style={{ border: "1px solid rgba(217,234,250,0.25)", color: "rgba(217,234,250,0.8)", borderRadius: "2px" }}>Contact Me</button></Magnetic>
+            <Magnetic><a href="/adrian_zachary_resume.pdf" download className="font-cinzel text-sm tracking-widest px-7 py-3 transition-all duration-300 hover:bg-[#F6BC7C]/10" style={{ border: "1px solid rgba(246,188,124,0.25)", color: "rgba(246,188,124,0.7)", borderRadius: "2px" }}>Download Resume</a></Magnetic>
           </motion.div>
 
           <motion.div className="flex gap-6 md:gap-10 text-center flex-wrap justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }}>
@@ -570,120 +737,126 @@ export default function Home() {
               </div>
             ))}
           </motion.div>
-
-        </section>
-
-        <RuneDivider />
-
-        {/* ABOUT */}
-        <section id="about" className="px-6 py-24 relative overflow-hidden" style={{ background: "var(--bg-mid)" }}>
-          <div className="absolute right-10 top-1/2 -translate-y-1/2 text-[200px] select-none pointer-events-none opacity-[0.03] font-cinzel" style={{ color: "#F6BC7C" }}>⚜</div>
-          <div className="max-w-4xl mx-auto relative z-10">
-            <Reveal>
-              <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.4em] text-xs mb-4 opacity-80">ᚦ The Engineer ᚦ</p>
-              <h2 className="font-cinzel text-3xl md:text-5xl font-bold mb-8 text-white leading-tight" style={{ textShadow: "0 0 30px rgba(246,188,124,0.15)" }}>
-                I build practical and modern<br /><span className="text-[#F6BC7C]">digital systems.</span>
-              </h2>
-            </Reveal>
-            <Reveal delay={0.1}>
-              <div className="space-y-4">
-                {[
-                  "I am a final-year Software Engineering student with hands-on experience in web development, AI-assisted systems, enterprise workflows, and software support through my internship at Sarawak Information Systems (SAINS).",
-                  "My work focuses on building practical and meaningful systems that solve real workflow problems — from AI-enhanced recruitment features to environmental monitoring applications.",
-                  "I focus on creating clean, user-friendly, and efficient digital solutions while continuously strengthening my technical, analytical, and problem-solving skills through real project experience.",
-                ].map((text, i) => (
-                  <p key={i} className="font-crimson text-lg leading-relaxed" style={{ color: "var(--text-dim)" }}>{text}</p>
+          
+            </div>
+            <div className="relative flex justify-center mt-2">
+<motion.div className="relative flex flex-col items-center gap-2 font-cinzel text-[10px] tracking-[0.4em] uppercase" style={{ color: "rgba(246,188,124,0.45)" }}>
+            Scroll
+            <motion.span className="block w-px h-8" style={{ background: "linear-gradient(to bottom, #F6BC7C, transparent)" }} animate={{ scaleY: [0, 1, 0], originY: 0 }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }} />
+          </motion.div>
+            </div>
+          </div>
+          <div ref={(el) => { panelRefs.current[1] = el; ringDriver.current.panels[1].el = el; }} className="quest quest-panel">
+            <p className="font-cinzel text-[10px] uppercase tracking-[0.45em] text-center mb-2 -mt-6" style={{ color: "rgba(246,188,124,0.5)" }}>Landing II · The Engineer · {Math.round(LANDINGS[1].u * 104)} steps down</p>
+            <section id="about" className="px-6 md:px-12 py-16 md:py-20 relative overflow-hidden">
+              <div className="absolute right-10 top-1/2 -translate-y-1/2 text-[200px] select-none pointer-events-none opacity-[0.03] font-cinzel" style={{ color: "#F6BC7C" }}>⚜</div>
+              <div className="max-w-4xl mx-auto relative z-10">
+                <Reveal>
+                  <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.4em] text-xs mb-4 opacity-80">ᚦ The Engineer ᚦ</p>
+                  <h2 className="font-cinzel text-3xl md:text-5xl font-bold mb-8 text-white leading-tight" style={{ textShadow: "0 0 30px rgba(246,188,124,0.15)" }}>
+                    I build practical and modern<br /><span className="text-[#F6BC7C]">digital systems.</span>
+                  </h2>
+                </Reveal>
+                <Reveal delay={0.1}>
+                  <div className="space-y-4">
+                    {[
+                      "I am a final-year Software Engineering student with hands-on experience in web development, AI-assisted systems, enterprise workflows, and software support through my internship at Sarawak Information Systems (SAINS).",
+                      "My work focuses on building practical and meaningful systems that solve real workflow problems — from AI-enhanced recruitment features to environmental monitoring applications.",
+                      "I focus on creating clean, user-friendly, and efficient digital solutions while continuously strengthening my technical, analytical, and problem-solving skills through real project experience.",
+                    ].map((text, i) => (
+                      <p key={i} className="font-crimson text-lg leading-relaxed" style={{ color: "var(--text-dim)" }}>{text}</p>
+                    ))}
+                  </div>
+                </Reveal>
+                <Reveal delay={0.2}>
+                  <div className="mt-10 rounded-lg p-6 border border-[#F6BC7C]/20 relative overflow-hidden" style={{ background: "rgba(246,188,124,0.04)" }}>
+                    <div className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(to right, transparent, rgba(246,188,124,0.4), transparent)" }} />
+                    <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.4em] text-xs mb-3 opacity-70">⚔ Current Quest ⚔</p>
+                    <h3 className="font-cinzel text-lg font-semibold mb-2 text-white">AWS Certified Solutions Architect — Associate</h3>
+                    <p className="font-crimson text-base" style={{ color: "var(--text-dim)" }}>Currently preparing for certification while expanding cloud architecture and deployment knowledge.</p>
+                  </div>
+                </Reveal>
+              </div>
+            </section>
+          </div>
+          <div ref={(el) => { panelRefs.current[2] = el; ringDriver.current.panels[2].el = el; }} className="quest quest-panel">
+            <p className="font-cinzel text-[10px] uppercase tracking-[0.45em] text-center mb-2 -mt-6" style={{ color: "rgba(246,188,124,0.5)" }}>Landing III · The Arsenal · {Math.round(LANDINGS[2].u * 104)} steps down</p>
+            <section id="skills" className="px-6 md:px-12 py-16 md:py-20 relative">
+              <div className="max-w-6xl mx-auto">
+                <Reveal>
+                  <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.4em] text-xs mb-4 opacity-80">ᛞ The Arsenal ᛞ</p>
+                  <h2 className="font-cinzel text-3xl md:text-5xl font-bold mb-12 text-white">Tools &amp; Technologies</h2>
+                </Reveal>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                  {[["PHP", "Backend Development", "🔩"], ["Laravel", "Web Framework", "🌐"], ["MySQL", "Database Management", "🗄️"], ["Flutter", "Mobile App Development", "📱"], ["Firebase", "Backend Services", "🔥"], ["GitHub", "Version Control", "📜"], ["API", "API Integration", "⚡"], ["Next.js", "Frontend Framework", "✦"]].map(([title, desc, icon], i) => (
+                    <Reveal key={title} delay={i * 0.05}>
+                      <ArcaneCard>
+                        <div className="text-2xl mb-3 opacity-70">{icon}</div>
+                        <h3 className="font-cinzel text-base font-semibold mb-1 text-white">{title}</h3>
+                        <p className="font-crimson text-sm" style={{ color: "var(--text-dim)" }}>{desc}</p>
+                      </ArcaneCard>
+                    </Reveal>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </div>
+          <div ref={(el) => { panelRefs.current[3] = el; ringDriver.current.panels[3].el = el; }} className="quest quest-panel">
+            <p className="font-cinzel text-[10px] uppercase tracking-[0.45em] text-center mb-2 -mt-6" style={{ color: "rgba(246,188,124,0.5)" }}>Landing IV · The Chronicles · {Math.round(LANDINGS[3].u * 104)} steps down</p>
+            <section id="projects" className="px-6 md:px-12 py-16 md:py-20 relative">
+              <div className="max-w-6xl mx-auto">
+                <Reveal>
+                  <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.4em] text-xs mb-4 opacity-80">📜 The Chronicles 📜</p>
+                  <h2 className="font-cinzel text-3xl md:text-5xl font-bold mb-12 text-white">Featured Work</h2>
+                </Reveal>
+    
+                {PROJECTS.map((project, i) => (
+                  <ProjectBlock
+                    key={project.slug}
+                    project={project}
+                    onJump={scrollTo}
+                    last={i === PROJECTS.length - 1}
+                  />
                 ))}
               </div>
-            </Reveal>
-            <Reveal delay={0.2}>
-              <div className="mt-10 rounded-lg p-6 border border-[#F6BC7C]/20 relative overflow-hidden" style={{ background: "rgba(246,188,124,0.04)" }}>
-                <div className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(to right, transparent, rgba(246,188,124,0.4), transparent)" }} />
-                <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.4em] text-xs mb-3 opacity-70">⚔ Current Quest ⚔</p>
-                <h3 className="font-cinzel text-lg font-semibold mb-2 text-white">AWS Certified Solutions Architect — Associate</h3>
-                <p className="font-crimson text-base" style={{ color: "var(--text-dim)" }}>Currently preparing for certification while expanding cloud architecture and deployment knowledge.</p>
+            </section>
+          </div>
+          <div ref={(el) => { panelRefs.current[4] = el; ringDriver.current.panels[4].el = el; }} className="quest quest-panel">
+            <p className="font-cinzel text-[10px] uppercase tracking-[0.45em] text-center mb-2 -mt-6" style={{ color: "rgba(246,188,124,0.5)" }}>Landing V · The Floor · {Math.round(LANDINGS[4].u * 104)} steps down</p>
+            <section id="contact" className="px-6 md:px-12 py-16 md:py-20 relative overflow-hidden">
+              <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 60% at 50% 50%, rgba(246,188,124,0.04) 0%, transparent 70%)" }} />
+              <Reveal>
+                <div className="max-w-4xl mx-auto text-center relative z-10">
+                  <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.5em] text-xs mb-4 opacity-70">🔮 Summon Me 🔮</p>
+                  <h2 className="font-cinzel text-3xl md:text-5xl font-bold mb-5 text-white" style={{ textShadow: "0 0 30px rgba(246,188,124,0.15)" }}>Let&apos;s Work Together</h2>
+                  <p className="font-crimson text-lg mb-10 italic" style={{ color: "var(--text-dim)" }}>Open to software engineering opportunities, internships, and collaborative projects.</p>
+                  <div className="flex justify-center gap-3 flex-wrap px-4">
+                    <a href="mailto:adrianzachary825@gmail.com" className="font-cinzel text-sm tracking-widest px-7 py-3 transition-all duration-300 relative group" style={{ background: "rgba(246,188,124,0.12)", border: "1px solid rgba(246,188,124,0.4)", color: "#F6BC7C", borderRadius: "2px" }}>
+                      <span className="absolute top-0 left-0 w-2 h-2 border-t border-l border-[#F6BC7C]" /><span className="absolute top-0 right-0 w-2 h-2 border-t border-r border-[#F6BC7C]" /><span className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-[#F6BC7C]" /><span className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-[#F6BC7C]" />
+                      Email Me
+                    </a>
+                    <a href="https://github.com/JustZachary" target="_blank" className="font-cinzel text-sm tracking-widest px-7 py-3 transition-all duration-300 hover:bg-[#D9EAFA]/10" style={{ border: "1px solid rgba(217,234,250,0.25)", color: "rgba(217,234,250,0.8)", borderRadius: "2px" }}>GitHub</a>
+                    <a href="https://www.linkedin.com/in/adrian-zachary-ian-2a4748181/" target="_blank" className="font-cinzel text-sm tracking-widest px-7 py-3 transition-all duration-300 hover:bg-[#F6BC7C]/10" style={{ border: "1px solid rgba(246,188,124,0.25)", color: "rgba(246,188,124,0.7)", borderRadius: "2px" }}>LinkedIn</a>
+                  </div>
+                </div>
+              </Reveal>
+            </section>
+            <footer className="px-6 pt-10 pb-2 text-center border-t border-[#F6BC7C]/10 mt-10">
+              <div className="flex items-center justify-center gap-4 mb-3">
+                <div className="h-px w-16" style={{ background: "linear-gradient(to right, transparent, rgba(246,188,124,0.3))" }} />
+                <span className="text-[#F6BC7C]/30 text-xs font-cinzel">ᚠ ᛟ</span>
+                <div className="h-px w-16" style={{ background: "linear-gradient(to left, transparent, rgba(246,188,124,0.3))" }} />
               </div>
-            </Reveal>
+              <p className="font-cinzel text-xs tracking-widest" style={{ color: "rgba(217,234,250,0.35)" }}>© 2026 Adrian Zachary — Forged with Next.js &amp; Tailwind CSS</p>
+            </footer>
           </div>
-        </section>
+        </div>
 
-        <RuneDivider />
-
-        {/* SKILLS */}
-        <section id="skills" className="px-6 py-24" style={{ background: "var(--bg-deep)" }}>
-          <div className="max-w-6xl mx-auto">
-            <Reveal>
-              <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.4em] text-xs mb-4 opacity-80">ᛞ The Arsenal ᛞ</p>
-              <h2 className="font-cinzel text-3xl md:text-5xl font-bold mb-12 text-white">Tools &amp; Technologies</h2>
-            </Reveal>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-              {[["PHP", "Backend Development", "🔩"], ["Laravel", "Web Framework", "🌐"], ["MySQL", "Database Management", "🗄️"], ["Flutter", "Mobile App Development", "📱"], ["Firebase", "Backend Services", "🔥"], ["GitHub", "Version Control", "📜"], ["API", "API Integration", "⚡"], ["Next.js", "Frontend Framework", "✦"]].map(([title, desc, icon], i) => (
-                <Reveal key={title} delay={i * 0.05}>
-                  <ArcaneCard>
-                    <div className="text-2xl mb-3 opacity-70">{icon}</div>
-                    <h3 className="font-cinzel text-base font-semibold mb-1 text-white">{title}</h3>
-                    <p className="font-crimson text-sm" style={{ color: "var(--text-dim)" }}>{desc}</p>
-                  </ArcaneCard>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <RuneDivider />
-
-        {/* PROJECTS */}
-        <section id="projects" className="px-6 py-24" style={{ background: "var(--bg-mid)" }}>
-          <div className="max-w-6xl mx-auto">
-            <Reveal>
-              <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.4em] text-xs mb-4 opacity-80">📜 The Chronicles 📜</p>
-              <h2 className="font-cinzel text-3xl md:text-5xl font-bold mb-12 text-white">Featured Work</h2>
-            </Reveal>
-
-            {PROJECTS.map((project, i) => (
-              <ProjectBlock
-                key={project.slug}
-                project={project}
-                onJump={scrollTo}
-                last={i === PROJECTS.length - 1}
-              />
-            ))}
-          </div>
-        </section>
-
-        <RuneDivider />
-
-        {/* CONTACT */}
-        <section id="contact" className="px-6 py-24 relative overflow-hidden" style={{ background: "var(--bg-deep)" }}>
-          <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 60% at 50% 50%, rgba(246,188,124,0.04) 0%, transparent 70%)" }} />
-          <Reveal>
-            <div className="max-w-4xl mx-auto text-center relative z-10">
-              <p className="font-cinzel text-[#F6BC7C] uppercase tracking-[0.5em] text-xs mb-4 opacity-70">🔮 Summon Me 🔮</p>
-              <h2 className="font-cinzel text-3xl md:text-5xl font-bold mb-5 text-white" style={{ textShadow: "0 0 30px rgba(246,188,124,0.15)" }}>Let&apos;s Work Together</h2>
-              <p className="font-crimson text-lg mb-10 italic" style={{ color: "var(--text-dim)" }}>Open to software engineering opportunities, internships, and collaborative projects.</p>
-              <div className="flex justify-center gap-3 flex-wrap px-4">
-                <a href="mailto:adrianzachary825@gmail.com" className="font-cinzel text-sm tracking-widest px-7 py-3 transition-all duration-300 relative group" style={{ background: "rgba(246,188,124,0.12)", border: "1px solid rgba(246,188,124,0.4)", color: "#F6BC7C", borderRadius: "2px" }}>
-                  <span className="absolute top-0 left-0 w-2 h-2 border-t border-l border-[#F6BC7C]" /><span className="absolute top-0 right-0 w-2 h-2 border-t border-r border-[#F6BC7C]" /><span className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-[#F6BC7C]" /><span className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-[#F6BC7C]" />
-                  Email Me
-                </a>
-                <a href="https://github.com/JustZachary" target="_blank" className="font-cinzel text-sm tracking-widest px-7 py-3 transition-all duration-300 hover:bg-[#D9EAFA]/10" style={{ border: "1px solid rgba(217,234,250,0.25)", color: "rgba(217,234,250,0.8)", borderRadius: "2px" }}>GitHub</a>
-                <a href="https://www.linkedin.com/in/adrian-zachary-ian-2a4748181/" target="_blank" className="font-cinzel text-sm tracking-widest px-7 py-3 transition-all duration-300 hover:bg-[#F6BC7C]/10" style={{ border: "1px solid rgba(246,188,124,0.25)", color: "rgba(246,188,124,0.7)", borderRadius: "2px" }}>LinkedIn</a>
-              </div>
-            </div>
-          </Reveal>
-        </section>
-
-        {/* FOOTER */}
-        <footer className="px-6 py-8 text-center border-t border-[#F6BC7C]/10" style={{ background: "var(--bg-deep)" }}>
-          <div className="flex items-center justify-center gap-4 mb-3">
-            <div className="h-px w-16" style={{ background: "linear-gradient(to right, transparent, rgba(246,188,124,0.3))" }} />
-            <span className="text-[#F6BC7C]/30 text-xs font-cinzel">ᚠ ᛟ</span>
-            <div className="h-px w-16" style={{ background: "linear-gradient(to left, transparent, rgba(246,188,124,0.3))" }} />
-          </div>
-          <p className="font-cinzel text-xs tracking-widest" style={{ color: "rgba(217,234,250,0.35)" }}>© 2026 Adrian Zachary — Forged with Next.js &amp; Tailwind CSS</p>
-        </footer>
+        {/* the scroll length of the descent */}
+        <div style={{ height: `${totalVh}vh` }} aria-hidden />
         <AskTheCodex />
       </motion.main>
+      </SmoothScroll>
     </>
   );
 }
