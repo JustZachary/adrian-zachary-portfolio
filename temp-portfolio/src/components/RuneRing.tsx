@@ -376,11 +376,35 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const sealShader = useMemo(() => makeSealShader(glow), [glow]);
 
   /* Shared geometry and materials. */
-  const stepGeo = useMemo(() => new THREE.CylinderGeometry(RING_R, RING_R, STEP_THICK, 6, 1, false, Math.PI / 2 - WEDGE * 0.48, WEDGE * 0.96), []);
-  const nosingGeo = useMemo(() => new THREE.BoxGeometry(RING_R - PILLAR_R + 0.05, 0.012, 0.02), []);
+  /* A tread is a bevelled slab cut as a sector of the well — extruded
+     from a 2D shape so its top has proper planar UVs (the stone grain
+     runs across it instead of being smeared round a cylinder) and its
+     edges are chamfered, which is where torchlight catches. */
+  const stepGeo = useMemo(() => {
+    const shape = new THREE.Shape();
+    const a0 = -WEDGE * 0.48, a1 = WEDGE * 0.48, ri = PILLAR_R - 0.06, ro = RING_R;
+    shape.moveTo(Math.cos(a0) * ri, Math.sin(a0) * ri);
+    shape.lineTo(Math.cos(a0) * ro, Math.sin(a0) * ro);
+    for (let i = 1; i <= 6; i++) { const a = a0 + (a1 - a0) * (i / 6); shape.lineTo(Math.cos(a) * ro, Math.sin(a) * ro); }
+    shape.lineTo(Math.cos(a1) * ri, Math.sin(a1) * ri);
+    shape.closePath();
+    const g = new THREE.ExtrudeGeometry(shape, { depth: STEP_THICK - 0.05, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.03, bevelSegments: 2, curveSegments: 6 });
+    g.rotateX(-Math.PI / 2);          // shape plane → the tread's top
+    g.translate(0, -STEP_THICK / 2 + 0.025, 0);
+    g.computeVertexNormals();
+    return g;
+  }, []);
+  const nosingGeo = useMemo(() => new THREE.BoxGeometry(RING_R - PILLAR_R + 0.05, 0.008, 0.012), []);
+  const brassGeo = useMemo(() => new THREE.BoxGeometry(RING_R - PILLAR_R + 0.02, 0.014, 0.05), []);
+  const dirtGeo = useMemo(() => new THREE.PlaneGeometry(0.7, 0.45), []);
   const postGeo = useMemo(() => new THREE.CylinderGeometry(0.035, 0.045, 0.95, 6), []);
   const corbelGeo = useMemo(() => new THREE.BoxGeometry(0.34, 0.26, 0.3), []);
-  const stepMat = useMemo(() => stoneMaterial(tiledStone(maps, 1.2, 0.5), STONE_LIGHT, { emissive: "#2a2012", emissiveIntensity: 0.35 }), [maps]);
+  const stepMat = useMemo(() => stoneMaterial(tiledStone(maps, 0.55, 0.55), STONE_LIGHT, { emissive: "#2a2012", emissiveIntensity: 0.3 }), [maps]);
+  const brassMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#a8813f", roughness: 0.35, metalness: 0.9, envMapIntensity: 0.9 }), []);
+  const dirtMat = useMemo(() => new THREE.MeshBasicMaterial({ map: blob, color: "#14110c", transparent: true, opacity: 0.55, depthWrite: false }), [blob]);
+  const brassInst = useRef<THREE.InstancedMesh>(null);
+  const dirtInst = useRef<THREE.InstancedMesh>(null);
+  const DIRT = 160;
   const stoneMat = useMemo(() => stoneMaterial(tiledStone(maps, 0.6, 0.6), STONE), [maps]);
   const coneMat = useMemo(() => new THREE.MeshBasicMaterial({ color: EMBER, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), []);
   const ironMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5a4a38", roughness: 0.38, metalness: 0.85, envMapIntensity: 0.6 }), []);
@@ -427,6 +451,33 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
     place(corbelInst.current, RING_R - 0.25, -STEP_THICK / 2 - 0.13, 0);
     place(postInst.current, RING_R - 0.14, STEP_THICK / 2 + 0.47, 0);
     place(shadowInst.current, 0, -STEP_THICK / 2 - 0.012, 0);
+    place(brassInst.current, (RING_R + PILLAR_R) / 2, STEP_THICK / 2 - 0.004, 0.03, -WEDGE * 0.48);
+    // no two treads quite the same stone
+    if (treadInst.current) {
+      const c = new THREE.Color();
+      for (let k = 0; k < STEPS; k++) {
+        const v = 0.82 + Math.random() * 0.28, warm = 0.97 + Math.random() * 0.06;
+        c.setRGB(v * warm, v, v * (2 - warm));
+        treadInst.current.setColorAt(k, c);
+      }
+      treadInst.current.instanceColor!.needsUpdate = true;
+    }
+    // worn, dirty patches where feet fall
+    if (dirtInst.current) {
+      for (let i = 0; i < DIRT; i++) {
+        const k = Math.floor(Math.random() * STEPS);
+        const { angle, y } = steps[k];
+        const r = PILLAR_R + 0.4 + Math.random() * (RING_R - PILLAR_R - 0.7);
+        const da = (Math.random() - 0.5) * WEDGE * 0.7;
+        o.position.set(Math.cos(angle + da) * r, y + STEP_THICK / 2 + 0.004, Math.sin(angle + da) * r);
+        o.rotation.set(-Math.PI / 2, 0, Math.random() * Math.PI);
+        const sc = 0.6 + Math.random() * 0.9;
+        o.scale.set(sc, sc, 1);
+        o.updateMatrix();
+        dirtInst.current.setMatrixAt(i, o.matrix);
+      }
+      dirtInst.current.instanceMatrix.needsUpdate = true;
+    }
     if (nosingInst.current) { for (let k = 0; k < STEPS; k++) nosingInst.current.setColorAt(k, GOLD); nosingInst.current.instanceColor!.needsUpdate = true; }
   }, [steps]);
 
@@ -635,7 +686,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
     if (nosingInst.current) {
       for (let i = 0; i < STEPS; i++) {
         const wave = Math.sin(t * 2.2 - i * 0.45);
-        const b = 0.45 + 0.4 * Math.max(0, wave) + (Math.abs(u * STEPS - i) < 1.5 ? 0.3 : 0);
+        const b = 0.18 + 0.28 * Math.max(0, wave) + (Math.abs(u * STEPS - i) < 1.5 ? 0.25 : 0);
         nosingInst.current.setColorAt(i, nosingColor.copy(GOLD).multiplyScalar(b));
       }
       nosingInst.current.instanceColor!.needsUpdate = true;
@@ -803,6 +854,8 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       {/* the steps: tread, glowing nosing, corbel beneath, baluster post — instanced */}
       <instancedMesh ref={treadInst} args={[stepGeo, stepMat, STEPS]} frustumCulled={false} />
       <instancedMesh ref={nosingInst} args={[nosingGeo, nosingMat, STEPS]} frustumCulled={false} />
+      <instancedMesh ref={brassInst} args={[brassGeo, brassMat, STEPS]} frustumCulled={false} />
+      <instancedMesh ref={dirtInst} args={[dirtGeo, dirtMat, DIRT]} frustumCulled={false} />
       <instancedMesh ref={corbelInst} args={[corbelGeo, stoneMat, STEPS]} frustumCulled={false} />
       <instancedMesh ref={postInst} args={[postGeo, ironMat, STEPS]} frustumCulled={false} />
       {/* a dark wedge just under each tread: the shadow it throws on the step below */}
