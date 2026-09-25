@@ -463,7 +463,7 @@ export default function Home() {
       const p = d.panels[seg.i];
       p.fade = 1;
       p.shift = frac * seg.travel;
-      if (d.panels[seg.i + 1]) d.panels[seg.i + 1].fade = 0.55;
+      // the next quest stays out of sight until you set off toward it
     } else {
       const e = frac * frac * (3 - 2 * frac);
       d.u = seg.from + (seg.to - seg.from) * e;
