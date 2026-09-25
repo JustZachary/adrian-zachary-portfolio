@@ -128,122 +128,184 @@ function makeRuneTexture(rune: string) {
   return t;
 }
 
-/* Masonry with relief. A height field — value noise over block courses
-   with recessed mortar — becomes a colour map, a normal map (Sobel) and
-   a roughness map, so torchlight actually rakes across the stone. */
-function makeStoneMaps() {
-  const size = 1024;
-  const grid = 48;
-  const rnd = (x: number, y: number) => {
-    const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+/* Masonry, three kinds, generated off the main thread.
+ *
+ * stoneGen is self-contained on purpose: it is stringified into a Web
+ * Worker, so it may not touch THREE, closures or imports. It builds a
+ * height field — blocks with recessed mortar, domain-warped noise for
+ * the grain, pits, hairline cracks — and from it a colour map, a
+ * normal map (Sobel) and a roughness map. Everything is periodic so
+ * the tile repeats without seams.
+ *
+ *   ashlar  the shaft wall: courses of uneven blocks, chipped corners,
+ *           each block tilted a fraction, water runs and lichen
+ *   flag    treads and floor: irregular flagstones with worn centres
+ *   drum    the pillar: big drums with heavy chamfers
+ */
+type StoneKind = "ashlar" | "flag" | "drum";
+function stoneGen(kind: StoneKind, size: number, seed: number) {
+  const P = 8; // noise lattice period, in cells per tile
+  const rnd = (x: number, y: number, z = 0) => {
+    const n = Math.sin(x * 127.1 + y * 311.7 + z * 74.7 + seed * 0.37) * 43758.5453;
     return n - Math.floor(n);
   };
-  const smooth = (t: number) => t * t * (3 - 2 * t);
-  const noise = (x: number, y: number) => {
-    const xi = Math.floor(x), yi = Math.floor(y), xf = smooth(x - xi), yf = smooth(y - yi);
-    const a = rnd(xi, yi), b = rnd(xi + 1, yi), c = rnd(xi, yi + 1), d = rnd(xi + 1, yi + 1);
+  const sm = (t: number) => t * t * (3 - 2 * t);
+  const pr = (x: number, y: number, per: number, z = 0) => rnd(((x % per) + per) % per, ((y % per) + per) % per, z);
+  const noise = (x: number, y: number, per: number, z = 0) => {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = sm(x - xi), yf = sm(y - yi);
+    const a = pr(xi, yi, per, z), b = pr(xi + 1, yi, per, z), c = pr(xi, yi + 1, per, z), d = pr(xi + 1, yi + 1, per, z);
     return a + (b - a) * xf + (c - a) * yf + (a - b - c + d) * xf * yf;
   };
-  const height = new Float32Array(size * size);
-  const tone = new Float32Array(size * size);
-  const course = size / 4;           // 4 courses per tile
-  const block = size / 2;            // 2 blocks per course
-  const M = size / 512;              // mortar and pit scale follow the resolution
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const row = Math.floor(y / course);
-      const off = row % 2 ? block / 2 : 0;
-      const bx = ((x + off) % block) / block, by = (y % course) / course;
-      // mortar: a soft groove along block edges
-      const ex = Math.min(bx, 1 - bx) * block, ey = Math.min(by, 1 - by) * course;
-      const edge = Math.min(ex, ey);
-      const mortar = 1 - Math.min(1, edge / (9 * M));
-      const bId = Math.floor((x + off) / block) + row * 7;
-      const bt = 0.75 + rnd(bId, 3) * 0.5;      // each block its own tone
-      let n = 0, amp = 0.5, f = grid / size;
-      for (let o = 0; o < 4; o++) { n += noise(x * f, y * f) * amp; amp *= 0.5; f *= 2; }
-      const pits = Math.pow(noise(x * 0.09 / M, y * 0.09 / M), 6) * 0.6;
-      const h = (1 - mortar * 0.9) * (0.55 + n * 0.45) - pits;
-      height[y * size + x] = h;
-      tone[y * size + x] = bt * (0.6 + n * 0.5) * (1 - mortar * 0.55);
-    }
-  }
-  const at = (x: number, y: number) => height[((y + size) % size) * size + ((x + size) % size)];
-  const mk = () => { const c = document.createElement("canvas"); c.width = c.height = size; return c; };
-  const cCol = mk(), cNor = mk(), cRgh = mk();
-  const iCol = cCol.getContext("2d")!.createImageData(size, size);
-  const iNor = cNor.getContext("2d")!.createImageData(size, size);
-  const iRgh = cRgh.getContext("2d")!.createImageData(size, size);
-  const base = [0x8a, 0x7e, 0x66];
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const i = (y * size + x) * 4;
-      const t = tone[y * size + x];
-      const warm = 0.9 + rnd(x, y) * 0.1;
-      iCol.data[i] = base[0] * t * warm; iCol.data[i + 1] = base[1] * t; iCol.data[i + 2] = base[2] * t * (2 - warm); iCol.data[i + 3] = 255;
-      const dx = (at(x + 1, y) - at(x - 1, y)) * 3.5 * M, dy = (at(x, y + 1) - at(x, y - 1)) * 3.5 * M;
-      const len = Math.hypot(dx, dy, 1);
-      iNor.data[i] = ((-dx / len) * 0.5 + 0.5) * 255; iNor.data[i + 1] = ((-dy / len) * 0.5 + 0.5) * 255; iNor.data[i + 2] = (1 / len * 0.5 + 0.5) * 255; iNor.data[i + 3] = 255;
-      const r = 0.7 + (1 - height[y * size + x]) * 0.3;
-      iRgh.data[i] = iRgh.data[i + 1] = iRgh.data[i + 2] = r * 255; iRgh.data[i + 3] = 255;
-    }
-  }
-  cCol.getContext("2d")!.putImageData(iCol, 0, 0);
-  cNor.getContext("2d")!.putImageData(iNor, 0, 0);
-  cRgh.getContext("2d")!.putImageData(iRgh, 0, 0);
-  const tex = (c: HTMLCanvasElement, srgb: boolean) => {
-    const t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.anisotropy = 8;
-    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-    return t;
+  const fbm = (u: number, v: number, per: number, oct: number, z = 0) => {
+    let n = 0, amp = 0.5, f = per, tot = 0;
+    for (let o = 0; o < oct; o++) { n += noise(u * f, v * f, f, z + o) * amp; tot += amp; amp *= 0.5; f *= 2; }
+    return n / tot;
   };
-  return { map: tex(cCol, true), normalMap: tex(cNor, false), roughnessMap: tex(cRgh, false) };
-}
-type StoneMaps = { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: THREE.Texture };
-function tiledStone(src: StoneMaps, rx: number, ry: number): StoneMaps {
-  const c = (t: THREE.Texture) => { const k = t.clone(); k.repeat.set(rx, ry); k.needsUpdate = true; return k; };
-  return { map: c(src.map), normalMap: c(src.normalMap), roughnessMap: c(src.roughnessMap) };
-}
-function stoneMaterial(maps: StoneMaps, color: string, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) {
-  return new THREE.MeshStandardMaterial({ color, map: maps.map, normalMap: maps.normalMap, normalScale: new THREE.Vector2(1.2, 1.2), roughnessMap: maps.roughnessMap, roughness: 1, metalness: 0.02, envMapIntensity: 0.35, ...extra });
+  // domain-warped grain: veins and swirls rather than static
+  const grain = (u: number, v: number) => {
+    // a gentle warp: rough stone, not carved scrollwork
+    const q = fbm(u, v, P, 2, 11);
+    return 0.35 * fbm(u + 0.12 * q, v + 0.08 * q, P, 3, 23) + 0.65 * fbm(u, v, P * 3, 4, 37);
+  };
+  // Worley cells with a period, for flagstones and cracks
+  const worley = (u: number, v: number, per: number, z: number) => {
+    const cx = Math.floor(u * per), cy = Math.floor(v * per);
+    let f1 = 9, f2 = 9, id = 0;
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+      const gx = cx + i, gy = cy + j;
+      const px = gx + pr(gx, gy, per, z), py = gy + pr(gx, gy, per, z + 5);
+      const dx = u * per - px, dy = v * per - py;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < f1) { f2 = f1; f1 = d; id = ((gx % per) + per) % per + (((gy % per) + per) % per) * per; }
+      else if (d < f2) f2 = d;
+    }
+    return { f1, f2, id };
+  };
+
+  const N = size * size;
+  const H = new Float32Array(N), T = new Float32Array(N), RG = new Float32Array(N), LICH = new Float32Array(N), WET = new Float32Array(N);
+  const px = 1 / size;
+  for (let y = 0; y < size; y++) {
+    const v = y * px;
+    for (let x = 0; x < size; x++) {
+      const u = x * px;
+      const i = y * size + x;
+      let mortar = 0, tone = 1, tilt = 0, faceId = 0, wear = 0;
+      if (kind === "ashlar" || kind === "drum") {
+        const courses = kind === "ashlar" ? 4 : 3;
+        const perCourse = kind === "ashlar" ? 2 : 3;
+        const row = Math.floor(v * courses);
+        const off = kind === "ashlar" ? (row % 2 ? 0.5 : 0) : (row % 3) * 0.33;
+        const bu = (u + off / perCourse) * perCourse;
+        const k = Math.floor(bu), lu = bu - k;
+        // uneven block widths: each boundary is shifted a little
+        const sL = (pr(k, row, perCourse * 4, 3) - 0.5) * 0.28, sR = (pr(k + 1, row, perCourse * 4, 3) - 0.5) * 0.28;
+        const ex = Math.min(lu - sL, 1 + sR - lu) * (size / perCourse);
+        const lv = v * courses - row;
+        const ey = Math.min(lv, 1 - lv) * (size / courses);
+        faceId = k + row * 31;
+        const chamfer = kind === "drum" ? 26 : 10;
+        const wobble = 0.7 + 0.6 * noise(x * 0.03, y * 0.03, size * 0.03, 41);
+        const edge = Math.min(ex, ey);
+        mortar = 1 - Math.min(1, edge / (chamfer * (size / 512) * wobble));
+        // chipped corners
+        const corner = Math.max(0, 1 - Math.hypot(ex, ey) / (34 * (size / 512)));
+        if (corner > 0 && pr(faceId, 7, 997, 9) < 0.45) mortar = Math.max(mortar, corner * corner * 0.8);
+        tone = 0.78 + pr(faceId, 1, 997, 2) * 0.44;
+        if (kind === "ashlar") tilt = ((pr(faceId, 2, 997, 4) - 0.5) * (lu - 0.5) + (pr(faceId, 3, 997, 6) - 0.5) * (lv - 0.5)) * 0.35;
+      } else {
+        // flagstones: irregular cells, mortar along the borders
+        const w = worley(u, v, 3, 17);
+        const border = w.f2 - w.f1;
+        const wobble = 0.8 + 0.4 * noise(x * 0.05, y * 0.05, size * 0.05, 43);
+        mortar = 1 - Math.min(1, border / (0.085 * wobble));
+        faceId = w.id;
+        tone = 0.8 + pr(faceId, 1, 997, 2) * 0.4;
+        tilt = ((pr(faceId, 2, 997, 4) - 0.5) * 0.25) * (0.5 - w.f1);
+        wear = Math.max(0, 1 - w.f1 / 0.32); // smoother, paler toward each stone's middle
+      }
+      const g = grain(u, v);
+      const pits = Math.pow(noise(x * 0.09 / (size / 512), y * 0.09 / (size / 512), size * 0.09 / (size / 512), 51), 5) * 0.7;
+      // hairline cracks: the borders of a large Worley, only on some cells
+      const cw = worley(u, v, 5, 61);
+      const crack = (cw.f2 - cw.f1 < 0.012 && pr(cw.id, 9, 997, 13) < 0.35) ? 0.35 : 0;
+      const h = (1 - mortar * 0.92) * (0.68 + g * 0.22 + tilt) - pits * (1 - mortar) - crack;
+      H[i] = h;
+      // water runs: dark, slightly glossy vertical streaks (walls only)
+      const run = kind === "ashlar" ? Math.pow(noise(x * 0.9 / (size / 512), y * 0.015 / (size / 512), size, 71), 3) * (0.3 + 0.7 * v) : 0;
+      WET[i] = run;
+      // lichen: pale patches on some faces
+      const lichen = kind === "flag" ? 0 : Math.max(0, fbm(u, v, 3, 3, 83) - 0.58) * 3 * (1 - mortar);
+      LICH[i] = Math.min(1, lichen);
+      T[i] = tone * (0.72 + g * 0.35) * (1 - mortar * 0.5) * (1 - run * 0.45) * (1 + wear * 0.12);
+      RG[i] = mortar > 0.5 ? 0.98 : 0.62 + (1 - g) * 0.3 - wear * 0.25 - run * 0.3 + pits * 0.5;
+    }
+  }
+  const at = (x: number, y: number) => H[((y + size) % size) * size + ((x + size) % size)];
+  const col = new Uint8ClampedArray(N * 4), nor = new Uint8ClampedArray(N * 4), rgh = new Uint8ClampedArray(N * 4);
+  const base = kind === "flag" ? [0x90, 0x82, 0x68] : kind === "drum" ? [0x84, 0x7a, 0x64] : [0x88, 0x7c, 0x64];
+  const lich = [0x7c, 0x86, 0x5a];
+  const M = size / 512;
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const i = y * size + x, o = i * 4;
+    const t = T[i], l = LICH[i];
+    const warm = 0.94 + rnd(x, y, 5) * 0.12;
+    for (let c = 0; c < 3; c++) {
+      const b = base[c] * (1 - l) + lich[c] * l;
+      const w = c === 0 ? warm : c === 2 ? 2 - warm : 1;
+      col[o + c] = b * t * w;
+    }
+    col[o + 3] = 255;
+    const dx = (at(x + 1, y) - at(x - 1, y)) * 4 * M, dy = (at(x, y + 1) - at(x, y - 1)) * 4 * M;
+    const len = Math.hypot(dx, dy, 1);
+    nor[o] = ((-dx / len) * 0.5 + 0.5) * 255; nor[o + 1] = ((-dy / len) * 0.5 + 0.5) * 255; nor[o + 2] = ((1 / len) * 0.5 + 0.5) * 255; nor[o + 3] = 255;
+    const r = Math.min(1, Math.max(0.2, RG[i]));
+    rgh[o] = rgh[o + 1] = rgh[o + 2] = r * 255; rgh[o + 3] = 255;
+  }
+  return { col, nor, rgh, size };
 }
 
-/* (kept for the landing collar and small parts) */
-function makeStoneTexture() {
-  const size = 256;
-  const c = document.createElement("canvas");
-  c.width = c.height = size;
-  const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#6a6250";
-  ctx.fillRect(0, 0, size, size);
-  const img = ctx.getImageData(0, 0, size, size);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const n = (Math.random() - 0.5) * 70;
-    d[i] += n; d[i + 1] += n; d[i + 2] += n * 0.9;
+type StoneMaps = { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: THREE.Texture; all: THREE.Texture[] };
+
+/* A placeholder set of textures that a worker fills in when the real
+   masonry is ready. Clones (for different tilings) are registered so
+   they can be re-uploaded when the data arrives. */
+function makeStoneMaps(kind: StoneKind, size: number, seed: number): StoneMaps {
+  const flat = (r: number, g: number, b: number, srgb: boolean) => {
+    const t = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1, THREE.RGBAFormat);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 8;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.generateMipmaps = true;
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    t.needsUpdate = true;
+    return t;
+  };
+  const maps: StoneMaps = { map: flat(0x6a, 0x60, 0x4c, true), normalMap: flat(128, 128, 255, false), roughnessMap: flat(240, 240, 240, false), all: [] };
+  maps.all.push(maps.map, maps.normalMap, maps.roughnessMap);
+  if (typeof window !== "undefined") {
+    const src = `const gen = ${stoneGen.toString()}; self.onmessage = (e) => { const r = gen(e.data.kind, e.data.size, e.data.seed); self.postMessage(r, [r.col.buffer, r.nor.buffer, r.rgh.buffer]); };`;
+    const worker = new Worker(URL.createObjectURL(new Blob([src], { type: "application/javascript" })));
+    worker.onerror = (e) => console.error("stone worker:", e.message, e.lineno);
+    worker.onmessage = (e: MessageEvent<{ col: Uint8ClampedArray; nor: Uint8ClampedArray; rgh: Uint8ClampedArray; size: number }>) => {
+      const { col, nor, rgh, size: sz } = e.data;
+      const fill = (t: THREE.Texture, data: Uint8ClampedArray) => { t.image = { data: new Uint8Array(data.buffer), width: sz, height: sz }; };
+      fill(maps.map, col); fill(maps.normalMap, nor); fill(maps.roughnessMap, rgh);
+      // the 1×1 placeholder was uploaded as immutable GL storage, so the
+      // GPU copy must be dropped and made afresh at the real size
+      for (const t of maps.all) { t.dispose(); t.needsUpdate = true; }
+      worker.terminate();
+    };
+    worker.postMessage({ kind, size, seed });
   }
-  ctx.putImageData(img, 0, 0);
-  ctx.strokeStyle = "rgba(0,0,0,0.35)";
-  ctx.lineWidth = 2;
-  for (let i = 0; i < 18; i++) {
-    ctx.beginPath();
-    let x = Math.random() * size, y = Math.random() * size;
-    ctx.moveTo(x, y);
-    for (let j = 0; j < 6; j++) { x += (Math.random() - 0.5) * 60; y += (Math.random() - 0.5) * 60; ctx.lineTo(x, y); }
-    ctx.stroke();
-  }
-  ctx.strokeStyle = "rgba(0,0,0,0.5)";
-  ctx.lineWidth = 3;
-  for (let y = 0; y < size; y += 64) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size, y); ctx.stroke();
-    const off = (y / 64) % 2 ? 64 : 0;
-    for (let x = off; x < size; x += 128) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 64); ctx.stroke(); }
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+  return maps;
+}
+function tiledStone(src: StoneMaps, rx: number, ry: number): StoneMaps {
+  const c = (t: THREE.Texture) => { const k = t.clone(); k.repeat.set(rx, ry); k.needsUpdate = true; src.all.push(k); return k; };
+  return { map: c(src.map), normalMap: c(src.normalMap), roughnessMap: c(src.roughnessMap), all: src.all };
+}
+function stoneMaterial(maps: StoneMaps, color: string, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) {
+  return new THREE.MeshStandardMaterial({ color, map: maps.map, normalMap: maps.normalMap, normalScale: new THREE.Vector2(1.35, 1.35), roughnessMap: maps.roughnessMap, roughness: 1, metalness: 0.02, envMapIntensity: 0.35, ...extra });
 }
 
 /* The handrail follows the stair: a helix. */
@@ -364,14 +426,14 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
     scene.environmentIntensity = 0.22;
     return () => { scene.environment = null; env.dispose(); pmrem.dispose(); };
   }, [scene, renderer]);
-  const stone = useMemo(() => makeStoneTexture(), []);
-  const maps = useMemo(() => makeStoneMaps(), []);
+  const ashlar = useMemo(() => makeStoneMaps("ashlar", 1024, 1), []);
+  const flag = useMemo(() => makeStoneMaps("flag", 1024, 2), []);
+  const drum = useMemo(() => makeStoneMaps("drum", 768, 3), []);
   // one tile ≈ 2 world units, so texel density is even across surfaces
-  const wallMat = useMemo(() => stoneMaterial(tiledStone(maps, 13, 23), STONE_DARK, { side: THREE.BackSide }), [maps]);
-  const pillarMat = useMemo(() => stoneMaterial(tiledStone(maps, 2.5, 23), STONE_LIGHT), [maps]);
-  const floorMat = useMemo(() => stoneMaterial(tiledStone(maps, 4, 4), STONE_DARK), [maps]);
-  const landingMat = useMemo(() => stoneMaterial(tiledStone(maps, 3, 0.4), STONE), [maps]);
-  const stoneLanding = useMemo(() => { const t = stone.clone(); t.repeat.set(4, 1); t.needsUpdate = true; return t; }, [stone]);
+  const wallMat = useMemo(() => stoneMaterial(tiledStone(ashlar, 13, 23), STONE_DARK, { side: THREE.BackSide }), [ashlar]);
+  const pillarMat = useMemo(() => stoneMaterial(tiledStone(drum, 2.5, 23), STONE_LIGHT), [drum]);
+  const floorMat = useMemo(() => stoneMaterial(tiledStone(flag, 4, 4), STONE_DARK), [flag]);
+  const landingMat = useMemo(() => stoneMaterial(tiledStone(flag, 3, 0.4), STONE), [flag]);
   const runeTextures = useMemo(() => RUNES.map(makeRuneTexture), []);
   const sealData = useMemo(() => makeSeal(1100), []);
   const sealShader = useMemo(() => makeSealShader(glow), [glow]);
@@ -411,13 +473,13 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const dirtGeo = useMemo(() => new THREE.PlaneGeometry(0.7, 0.45), []);
   const postGeo = useMemo(() => new THREE.CylinderGeometry(0.035, 0.045, 0.95, 6), []);
   const corbelGeo = useMemo(() => new THREE.BoxGeometry(0.34, 0.26, 0.3), []);
-  const stepMat = useMemo(() => stoneMaterial(tiledStone(maps, 0.55, 0.55), STONE_LIGHT, { emissive: "#2a2012", emissiveIntensity: 0.25, vertexColors: true }), [maps]);
+  const stepMat = useMemo(() => stoneMaterial(tiledStone(flag, 0.55, 0.55), STONE_LIGHT, { emissive: "#2a2012", emissiveIntensity: 0.25, vertexColors: true }), [flag]);
   const brassMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#a8813f", roughness: 0.35, metalness: 0.9, envMapIntensity: 0.9 }), []);
   const dirtMat = useMemo(() => new THREE.MeshBasicMaterial({ map: blob, color: "#14110c", transparent: true, opacity: 0.55, depthWrite: false }), [blob]);
   const brassInst = useRef<THREE.InstancedMesh>(null);
   const dirtInst = useRef<THREE.InstancedMesh>(null);
   const DIRT = 160;
-  const stoneMat = useMemo(() => stoneMaterial(tiledStone(maps, 0.6, 0.6), STONE), [maps]);
+  const stoneMat = useMemo(() => stoneMaterial(tiledStone(ashlar, 0.6, 0.6), STONE), [ashlar]);
   const coneMat = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.035, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), []);
   const coneColor = useMemo(() => new THREE.Color(), []);
   const ironMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5a4a38", roughness: 0.38, metalness: 0.85, envMapIntensity: 0.6 }), []);
@@ -784,9 +846,8 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       <mesh position={[0, 4.5, 0]} material={wallMat}>
         <sphereGeometry args={[WALL_R, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
       </mesh>
-      <mesh position={[0, 4.4, 0]}>
+      <mesh position={[0, 4.4, 0]} material={stoneMat}>
         <torusGeometry args={[WALL_R - 0.05, 0.12, 8, 64]} />
-        <meshStandardMaterial color={STONE} map={stoneLanding} roughness={0.9} />
       </mesh>
 
       {/* pilasters: stone ribs up the wall */}
@@ -855,9 +916,8 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
             <torusGeometry args={[PILLAR_R + 0.03, 0.015, 8, 64]} />
             <meshBasicMaterial color={GOLD} transparent opacity={0.5} blending={THREE.AdditiveBlending} depthWrite={false} />
           </mesh>
-          <mesh position={[0, -0.32, 0]}>
+          <mesh position={[0, -0.32, 0]} material={stoneMat}>
             <cylinderGeometry args={[PILLAR_R + 0.09, PILLAR_R + 0.02, 0.22, 32]} />
-            <meshStandardMaterial color={STONE} map={stoneLanding} roughness={0.9} />
           </mesh>
         </group>
       ))}
