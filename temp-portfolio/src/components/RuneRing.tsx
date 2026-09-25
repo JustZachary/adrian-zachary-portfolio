@@ -184,6 +184,7 @@ function stoneGen(kind: StoneKind, size: number, seed: number) {
 
   const N = size * size;
   const H = new Float32Array(N), T = new Float32Array(N), RG = new Float32Array(N), LICH = new Float32Array(N), WET = new Float32Array(N);
+  const FACE = new Int32Array(N);
   const px = 1 / size;
   for (let y = 0; y < size; y++) {
     const v = y * px;
@@ -192,22 +193,28 @@ function stoneGen(kind: StoneKind, size: number, seed: number) {
       const i = y * size + x;
       let mortar = 0, tone = 1, tilt = 0, faceId = 0, wear = 0;
       if (kind === "ashlar" || kind === "drum") {
-        const courses = kind === "ashlar" ? 4 : 3;
-        const perCourse = kind === "ashlar" ? 2 : 3;
-        const row = Math.floor(v * courses);
-        const off = kind === "ashlar" ? (row % 2 ? 0.5 : 0) : (row % 3) * 0.33;
+        // courses of two heights — a tall course, a short course — like coursed rubble
+        const courseEdges = kind === "ashlar" ? [0, 0.3, 0.5, 0.8, 1] : [0, 0.34, 0.67, 1];
+        let row = 0; while (v >= courseEdges[row + 1]) row++;
+        const c0 = courseEdges[row], c1 = courseEdges[row + 1];
+        const perCourse = kind === "ashlar" ? (row % 2 ? 3 : 2) : 3;
+        const off = kind === "ashlar" ? (row % 2 ? 0.5 : 0.15) : (row % 3) * 0.33;
         const bu = (u + off / perCourse) * perCourse;
         const k = Math.floor(bu), lu = bu - k;
-        // uneven block widths: each boundary is shifted a little
-        const sL = (pr(k, row, perCourse * 4, 3) - 0.5) * 0.28, sR = (pr(k + 1, row, perCourse * 4, 3) - 0.5) * 0.28;
+        // uneven block widths, and split (not sawn) edges: the boundary wanders
+        const sL = (pr(k, row, perCourse * 4, 3) - 0.5) * 0.28 + (noise(y * 0.08, k * 7, size, 91) - 0.5) * 0.05;
+        const sR = (pr(k + 1, row, perCourse * 4, 3) - 0.5) * 0.28 + (noise(y * 0.08, (k + 1) * 7, size, 91) - 0.5) * 0.05;
         const ex = Math.min(lu - sL, 1 + sR - lu) * (size / perCourse);
-        const lv = v * courses - row;
-        const ey = Math.min(lv, 1 - lv) * (size / courses);
+        const lv = (v - c0) / (c1 - c0);
+        const jog = (noise(x * 0.08, row * 5, size, 93) - 0.5) * 0.06;
+        const ey = Math.min(lv - jog, 1 - lv + jog) * (size * (c1 - c0));
         faceId = k + row * 31;
-        const chamfer = kind === "drum" ? 26 : 10;
+        const chamfer = kind === "drum" ? 26 : 11;
         const wobble = 0.7 + 0.6 * noise(x * 0.03, y * 0.03, size * 0.03, 41);
         const edge = Math.min(ex, ey);
-        mortar = 1 - Math.min(1, edge / (chamfer * (size / 512) * wobble));
+        // tumbled: the recess has a rounded profile, not a straight bevel
+        const m0 = 1 - Math.min(1, edge / (chamfer * (size / 512) * wobble));
+        mortar = m0 * m0 * (3 - 2 * m0);
         // chipped corners
         const corner = Math.max(0, 1 - Math.hypot(ex, ey) / (34 * (size / 512)));
         if (corner > 0 && pr(faceId, 7, 997, 9) < 0.45) mortar = Math.max(mortar, corner * corner * 0.8);
@@ -225,35 +232,48 @@ function stoneGen(kind: StoneKind, size: number, seed: number) {
         wear = Math.max(0, 1 - w.f1 / 0.32); // smoother, paler toward each stone's middle
       }
       const g = grain(u, v);
+      // fine speckle, like granite grit in the surface
+      const speck = (rnd(x, y, 17) - 0.5) * 0.08;
+      // faint sinuous veins
+      const vn = 1 - Math.abs(2 * fbm(u * 1.3, v * 0.7, P, 3, 101) - 1);
+      const vein = Math.max(0, vn - 0.86) * 4 * (1 - mortar);
       const pits = Math.pow(noise(x * 0.09 / (size / 512), y * 0.09 / (size / 512), size * 0.09 / (size / 512), 51), 5) * 0.7;
       // hairline cracks: the borders of a large Worley, only on some cells
       const cw = worley(u, v, 5, 61);
       const crack = (cw.f2 - cw.f1 < 0.012 && pr(cw.id, 9, 997, 13) < 0.35) ? 0.35 : 0;
       const h = (1 - mortar * 0.92) * (0.68 + g * 0.22 + tilt) - pits * (1 - mortar) - crack;
       H[i] = h;
+      FACE[i] = Math.abs(Math.floor(faceId));
       // water runs: dark, slightly glossy vertical streaks (walls only)
       const run = kind === "ashlar" ? Math.pow(noise(x * 0.9 / (size / 512), y * 0.015 / (size / 512), size, 71), 3) * (0.3 + 0.7 * v) : 0;
       WET[i] = run;
       // lichen: pale patches on some faces
       const lichen = kind === "flag" ? 0 : Math.max(0, fbm(u, v, 3, 3, 83) - 0.58) * 3 * (1 - mortar);
       LICH[i] = Math.min(1, lichen);
-      T[i] = tone * (0.72 + g * 0.35) * (1 - mortar * 0.5) * (1 - run * 0.45) * (1 + wear * 0.12);
+      T[i] = tone * (0.72 + g * 0.35 + speck) * (1 - mortar * 0.5) * (1 - run * 0.45) * (1 + wear * 0.12) * (1 - vein * 0.35);
       RG[i] = mortar > 0.5 ? 0.98 : 0.62 + (1 - g) * 0.3 - wear * 0.25 - run * 0.3 + pits * 0.5;
     }
   }
   const at = (x: number, y: number) => H[((y + size) % size) * size + ((x + size) % size)];
   const col = new Uint8ClampedArray(N * 4), nor = new Uint8ClampedArray(N * 4), rgh = new Uint8ClampedArray(N * 4);
+  const HUE = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    // each stone leans warm tan, grey-beige or pale, by its id
+    const pick = FACE[i] % 3;
+    const t3 = pick === 0 ? [1.06, 0.98, 0.9] : pick === 1 ? [0.96, 0.98, 1.02] : [1.02, 1.02, 0.98];
+    HUE[i * 3] = t3[0]; HUE[i * 3 + 1] = t3[1]; HUE[i * 3 + 2] = t3[2];
+  }
   const base = kind === "flag" ? [0x90, 0x82, 0x68] : kind === "drum" ? [0x84, 0x7a, 0x64] : [0x88, 0x7c, 0x64];
   const lich = [0x7c, 0x86, 0x5a];
   const M = size / 512;
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const i = y * size + x, o = i * 4;
     const t = T[i], l = LICH[i];
-    const warm = 0.94 + rnd(x, y, 5) * 0.12;
+    const warm = 0.97 + rnd(x, y, 5) * 0.06;
     for (let c = 0; c < 3; c++) {
       const b = base[c] * (1 - l) + lich[c] * l;
       const w = c === 0 ? warm : c === 2 ? 2 - warm : 1;
-      col[o + c] = b * t * w;
+      col[o + c] = b * t * w * HUE[i * 3 + c];
     }
     col[o + 3] = 255;
     const dx = (at(x + 1, y) - at(x - 1, y)) * 4 * M, dy = (at(x, y + 1) - at(x, y - 1)) * 4 * M;
@@ -310,10 +330,11 @@ function stoneMaterial(maps: StoneMaps, color: string, extra: Partial<THREE.Mesh
 
 /* The handrail follows the stair: a helix. */
 class HelixCurve extends THREE.Curve<THREE.Vector3> {
-  constructor(private r: number, private lift: number) { super(); }
+  constructor(private r: number, private lift: number, private from = 0) { super(); }
   getPoint(t: number, target = new THREE.Vector3()) {
-    const a = angleAt(t);
-    return target.set(Math.cos(a) * this.r, treadY(t) + this.lift, Math.sin(a) * this.r);
+    const u = this.from + (1 - this.from) * t;
+    const a = angleAt(u);
+    return target.set(Math.cos(a) * this.r, treadY(u) + this.lift, Math.sin(a) * this.r);
   }
 }
 
@@ -433,7 +454,19 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const wallMat = useMemo(() => stoneMaterial(tiledStone(ashlar, 13, 23), STONE_DARK, { side: THREE.BackSide }), [ashlar]);
   const pillarMat = useMemo(() => stoneMaterial(tiledStone(drum, 2.5, 23), STONE_LIGHT), [drum]);
   const floorMat = useMemo(() => stoneMaterial(tiledStone(flag, 4, 4), STONE_DARK), [flag]);
-  const landingMat = useMemo(() => stoneMaterial(tiledStone(flag, 3, 0.4), STONE), [flag]);
+  const landingMat = useMemo(() => stoneMaterial(tiledStone(flag, 0.5, 0.5), STONE), [flag]);
+  const landingGeo = useMemo(() => {
+    const shape = new THREE.Shape();
+    shape.absarc(0, 0, RING_R + 0.15, 0, Math.PI * 2, false);
+    const hole = new THREE.Path();
+    hole.absarc(0, 0, PILLAR_R - 0.05, 0, Math.PI * 2, true);
+    shape.holes.push(hole);
+    const g = new THREE.ExtrudeGeometry(shape, { depth: STEP_THICK * 1.4, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.035, bevelSegments: 2, curveSegments: 48 });
+    g.rotateX(-Math.PI / 2);
+    g.translate(0, -STEP_THICK * 1.4 - 0.03, 0);
+    g.computeVertexNormals();
+    return g;
+  }, []);
   const runeTextures = useMemo(() => RUNES.map(makeRuneTexture), []);
   const sealData = useMemo(() => makeSeal(1100), []);
   const sealShader = useMemo(() => makeSealShader(glow), [glow]);
@@ -480,8 +513,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const dirtInst = useRef<THREE.InstancedMesh>(null);
   const DIRT = 160;
   const stoneMat = useMemo(() => stoneMaterial(tiledStone(ashlar, 0.6, 0.6), STONE), [ashlar]);
-  const coneMat = useMemo(() => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.035, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), []);
-  const coneColor = useMemo(() => new THREE.Color(), []);
+
   const ironMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5a4a38", roughness: 0.38, metalness: 0.85, envMapIntensity: 0.6 }), []);
   const shadowGeo = useMemo(() => new THREE.CylinderGeometry(RING_R + 0.08, RING_R + 0.08, 0.01, 6, 1, false, Math.PI / 2 - WEDGE * 0.55, WEDGE * 1.1), []);
   const shadowMat = useMemo(() => new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.42, depthWrite: false }), []);
@@ -490,14 +522,15 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   const grimeMat = useMemo(() => new THREE.SpriteMaterial({ map: blob, color: "#0b0a07", transparent: true, opacity: 0.5, depthWrite: false }), [blob]);
   const mossMat = useMemo(() => new THREE.SpriteMaterial({ map: blob, color: "#1c2a14", transparent: true, opacity: 0.55, depthWrite: false }), [blob]);
   /* Damp patches and soot on the wall, denser lower down. */
-  const grime = useMemo(() => Array.from({ length: 90 }, () => {
+  const grime = useMemo(() => Array.from({ length: 48 }, () => {
     const u = Math.pow(Math.random(), 0.7);
     const a = Math.random() * Math.PI * 2;
-    return { x: Math.cos(a) * (WALL_R - 0.06), y: treadY(u) + (Math.random() - 0.3) * 3, z: Math.sin(a) * (WALL_R - 0.06), s: 1.2 + Math.random() * 2.2 };
+    return { x: Math.cos(a) * (WALL_R - 0.06), y: treadY(u) + (Math.random() - 0.3) * 3, z: Math.sin(a) * (WALL_R - 0.06), s: 0.9 + Math.random() * 1.5 };
   }), []);
 
-  const railGeo = useMemo(() => new THREE.TubeGeometry(new HelixCurve(RING_R - 0.14, STEP_THICK / 2 + 0.95), STEPS * 4, 0.035, 8, false), []);
-  const railGeo2 = useMemo(() => new THREE.TubeGeometry(new HelixCurve(RING_R - 0.14, STEP_THICK / 2 + 0.5), STEPS * 4, 0.018, 6, false), []);
+  const RAIL_FROM = 2 / STEPS;
+  const railGeo = useMemo(() => new THREE.TubeGeometry(new HelixCurve(RING_R - 0.14, STEP_THICK / 2 + 0.95, RAIL_FROM), STEPS * 4, 0.035, 8, false), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const railGeo2 = useMemo(() => new THREE.TubeGeometry(new HelixCurve(RING_R - 0.14, STEP_THICK / 2 + 0.5, RAIL_FROM), STEPS * 4, 0.018, 6, false), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const steps = useMemo(() => Array.from({ length: STEPS }, (_, k) => stepPose(k)), []);
 
@@ -526,6 +559,8 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
     place(nosingInst.current, (RING_R + PILLAR_R) / 2, STEP_THICK / 2, 0, -WEDGE * 0.48);
     place(corbelInst.current, RING_R - 0.25, -STEP_THICK / 2 - 0.13, 0);
     place(postInst.current, RING_R - 0.14, STEP_THICK / 2 + 0.47, 0);
+    // no posts on the first two steps: the landing keeps an open edge
+    if (postInst.current) { const zero = new THREE.Matrix4().makeScale(0, 0, 0); postInst.current.setMatrixAt(0, zero); postInst.current.setMatrixAt(1, zero); postInst.current.instanceMatrix.needsUpdate = true; }
     place(shadowInst.current, 0, -STEP_THICK / 2 - 0.012, 0);
     place(brassInst.current, (RING_R + PILLAR_R) / 2, STEP_THICK / 2 - 0.004, 0.03, -WEDGE * 0.48);
     // no two treads quite the same stone
@@ -596,11 +631,9 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
 
   /* Torch furniture is instanced too: brackets, light cones, niche arches and sills. */
   const bracketInst = useRef<THREE.InstancedMesh>(null);
-  const coneInst = useRef<THREE.InstancedMesh>(null);
   const archInst = useRef<THREE.InstancedMesh>(null);
   const sillInst = useRef<THREE.InstancedMesh>(null);
   const bracketGeo = useMemo(() => new THREE.CylinderGeometry(0.025, 0.035, 0.42, 6), []);
-  const coneGeo = useMemo(() => new THREE.ConeGeometry(1.1, 2.4, 20, 1, true), []);
   const archGeo = useMemo(() => new THREE.TorusGeometry(0.42, 0.07, 8, 24, Math.PI), []);
   const sillGeo = useMemo(() => new THREE.BoxGeometry(0.98, 0.1, 0.14), []);
   const nicheCount = useMemo(() => torches.filter((t) => t.niche).length, [torches]);
@@ -619,7 +652,6 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       inst.instanceMatrix.needsUpdate = true;
     };
     set(bracketInst.current, "all", 0.1, -0.24, 0, 0, 0, 0.35);
-    set(coneInst.current, "all", -0.5, -1.1, 0, 0, 0, 0.5);
     set(archInst.current, "niche", 0.22, 0.1, 0, 0, Math.PI / 2, 0);
     set(sillInst.current, "niche", 0.22, -0.55, 0, 0, Math.PI / 2, 0);
   }, [torches]);
@@ -656,6 +688,8 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
   useEffect(() => { sealShader.uniforms.uPixelRatio.value = gl.getPixelRatio(); }, [gl, sealShader]);
 
   const smooth = useRef({ mx: 0, my: 0, u: 0, hero: 0, hold: 0 });
+  const litTorch = useRef({ a: -1, b: -1, ia: 0, ib: 0 });
+  const lightTarget = useMemo(() => [new THREE.Vector3(), new THREE.Vector3()], []);
   const tmp = useMemo(() => new THREE.Vector3(), []);
   const eye = useMemo(() => new THREE.Vector3(), []);
   const aim = useMemo(() => new THREE.Vector3(), []);
@@ -733,7 +767,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
       let best = 0, bestD = Infinity, second = 0, secondD = Infinity;
       torchGroup.current.children.forEach((m, i) => {
         const tk = torches[i];
-        const flicker = 0.88 + 0.08 * Math.sin(t * 5 + tk.seed) + 0.04 * Math.sin(t * 11 + tk.seed * 2);
+        const flicker = 0.92 + 0.05 * Math.sin(t * 5 + tk.seed) + 0.03 * Math.sin(t * 11 + tk.seed * 2);
         const sp = m.children[0] as THREE.Sprite | undefined;
         if (sp) { sp.material.opacity = 0.9 * flicker; sp.scale.setScalar(0.6 + 0.06 * flicker); }
         const inner = m.children[1] as THREE.Sprite | undefined, outer = m.children[2] as THREE.Sprite | undefined;
@@ -749,24 +783,27 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
         if (dist < bestD) { second = best; secondD = bestD; bestD = dist; best = i; }
         else if (dist < secondD) { secondD = dist; second = i; }
       });
-      // a cone you are standing in would fill the screen with haze: fade the near ones out
-      if (coneInst.current) {
-        torchGroup.current.children.forEach((m, i) => {
-          m.getWorldPosition(tmp);
-          const dist = tmp.distanceTo(cam.position);
-          const vis = Math.min(1, Math.max(0, (dist - 2.2) / 2.5));
-          coneInst.current!.setColorAt(i, coneColor.copy(EMBER).multiplyScalar(vis));
-        });
-        coneInst.current.instanceColor!.needsUpdate = true;
-      }
-      torchGroup.current.children[best].getWorldPosition(tmp);
-      torchLight.current.position.copy(tmp);
       const fl = (sd: number) => 0.94 + 0.03 * Math.sin(t * 3.1 + sd) + 0.02 * Math.sin(t * 7.3 + sd * 2) + 0.01 * Math.sin(t * 13 + sd * 3);
       const calm = 0.5 + 0.5 * s.hero; // the gate is lit softly; the stair by torchlight
-      torchLight.current.intensity = 70 * fl(torches[best].seed) * calm;
-      torchGroup.current.children[second].getWorldPosition(tmp);
-      torchLight2.current.position.copy(tmp);
-      torchLight2.current.intensity = 45 * fl(torches[second].seed) * calm;
+      // the lit pair is chosen with hysteresis, so two torches at equal
+      // distance don't trade places every frame, and the lights ease over
+      const lt = litTorch.current;
+      const distTo = (i: number) => { torchGroup.current!.children[i].getWorldPosition(tmp); return tmp.distanceTo(cam.position); };
+      if (lt.a < 0) { lt.a = best; lt.b = second; }
+      else {
+        const da = distTo(lt.a), db = distTo(lt.b);
+        if (best !== lt.a && best !== lt.b && bestD < Math.max(da, db) - 0.6) { if (da > db) lt.a = best; else lt.b = best; }
+        else if (second !== lt.a && second !== lt.b && secondD < Math.max(da, db) - 0.6) { if (da > db) lt.a = second; else lt.b = second; }
+      }
+      const kl = 1 - Math.exp(-dt * 6);
+      torchGroup.current.children[lt.a].getWorldPosition(lightTarget[0]);
+      torchGroup.current.children[lt.b].getWorldPosition(lightTarget[1]);
+      torchLight.current.position.lerp(lightTarget[0], kl);
+      torchLight2.current.position.lerp(lightTarget[1], kl);
+      lt.ia += (70 * fl(torches[lt.a].seed) * calm - lt.ia) * kl;
+      lt.ib += (45 * fl(torches[lt.b].seed) * calm - lt.ib) * kl;
+      torchLight.current.intensity = lt.ia;
+      torchLight2.current.intensity = lt.ib;
     }
 
     // light runs down the stair, step by step; the step you're on is lit
@@ -897,7 +934,7 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
           ))}
         </group>
         {/* the threshold and the bridge to the landing */}
-        <mesh position={[-0.75, 0, 0]} material={stoneMat}><boxGeometry args={[1.5, STEP_THICK * 1.5, 2.4]} /></mesh>
+        <mesh position={[-0.35, 0.02, 0]} material={stoneMat}><boxGeometry args={[0.7, STEP_THICK * 1.5, 2.4]} /></mesh>
         <mesh position={[-0.95, 0.01, -1.1]} material={ironMat}><boxGeometry args={[1.5, 0.04, 0.04]} /></mesh>
         <mesh position={[-0.95, 0.01, 1.1]} material={ironMat}><boxGeometry args={[1.5, 0.04, 0.04]} /></mesh>
       </group>
@@ -922,10 +959,8 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
         </group>
       ))}
 
-      {/* the top landing: a stone ring the seal lies on */}
-      <mesh position={[0, -0.2 - STEP_THICK / 2, 0]} material={landingMat}>
-        <cylinderGeometry args={[RING_R + 0.15, RING_R + 0.15, STEP_THICK * 1.5, 64]} />
-      </mesh>
+      {/* the top landing: a bevelled flagstone slab the seal lies on */}
+      <mesh geometry={landingGeo} material={landingMat} position={[0, -0.2, 0]} />
       <points position={[0, -0.2, 0]}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[sealData.pos, 3]} />
@@ -981,7 +1016,6 @@ function Well({ driver }: { driver: React.RefObject<RingDriver> }) {
         ))}
       </group>
       <instancedMesh ref={bracketInst} args={[bracketGeo, ironMat, torches.length]} frustumCulled={false} />
-      <instancedMesh ref={coneInst} args={[coneGeo, coneMat, torches.length]} frustumCulled={false} />
       <instancedMesh ref={archInst} args={[archGeo, stoneMat, nicheCount]} frustumCulled={false} />
       <instancedMesh ref={sillInst} args={[sillGeo, stoneMat, nicheCount]} frustumCulled={false} />
 
@@ -1025,7 +1059,7 @@ export default function RuneRing({ driver, className = "" }: { driver: React.Ref
   return (
     <div className={`absolute inset-0 ${className}`} aria-hidden>
       <Canvas
-        dpr={[1, 1.5]}
+        dpr={[1, 1.25]}
         camera={{ position: [2.4, 2.9, 1.0], fov: 60, near: 0.05, far: 40 }}
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance", toneMappingExposure: 0.8 }}
         style={{ background: "transparent" }}

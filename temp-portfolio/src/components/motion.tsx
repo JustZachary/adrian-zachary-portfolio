@@ -34,7 +34,7 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReduced) return;
-    const lenis = new Lenis({ lerp: 0.09, wheelMultiplier: 0.95, smoothWheel: true });
+    const lenis = new Lenis({ lerp: 0.075, wheelMultiplier: 0.85, smoothWheel: true });
     lenisInstance = lenis;
     let raf = 0;
     const loop = (time: number) => {
@@ -73,8 +73,8 @@ export function SplitReveal({
         <span key={i} className="inline-block overflow-hidden align-bottom" style={{ paddingBottom: "0.08em", marginBottom: "-0.08em" }}>
           <motion.span
             className="inline-block"
-            initial={{ y: "110%", opacity: 0, rotateX: -40 }}
-            animate={{ y: 0, opacity: 1, rotateX: 0 }}
+            initial={{ y: "110%", opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.9, delay: delay + i * stagger, ease: [0.22, 1, 0.36, 1] }}
           >
             {w}
