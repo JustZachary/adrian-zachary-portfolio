@@ -6,37 +6,41 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # This site
 
-The app lives in `temp-portfolio/`. One page, `src/app/page.tsx` — the
-runes, the portal intro and the section layouts are all in there.
+The app lives in `temp-portfolio/`. The page is a little retro computer,
+"AZ-OS": `src/components/Desktop.tsx` draws the desktop, its icons, the
+windows (drag, focus, minimise, close), the taskbar and start menu, and on
+phones the same windows stacked in one column. `src/app/page.tsx` only
+mounts it.
 
 ## Adding a project
 
 Do NOT write JSX for it. Append an object to `PROJECTS` in
-`src/data/projects.ts` and stop; the page renders every entry the same
-way, and that is the point — a project added by hand is one that ends up
-looking like a different website.
+`src/data/projects.ts` and stop; it appears as an icon in the projects
+folder and opens in its own window, drawn the same way as the others.
 
 The type in that file is the contract. In short:
 
-- `slug` — unique, also the anchor if there is a case study
-- `eyebrow` / `title` / `blurb` — the line above, the name, one sentence
+- `slug` — unique; the window is titled `<slug>.txt`
+- `title` / `kind` / `blurb` — the name, a short label, one sentence
+- `icon` / `tile` — a pixel icon from `src/components/icons.tsx` and the colour behind it
 - `notes` — Problem / Solution / My Contribution / Outcome, in that order
-- `layout` — `"flow"` for a column of headed paragraphs, `"cards"` for a grid
-- `glow` — alternate `"left"` and `"right"` down the page
 - `tech` — short names, the things a reader would recognise
-- `images` — files in `public/`; one sits beside the text, four make a grid
+- `images` — files in `public/`; `imageShape` "phone" for tall screenshots, "wide" otherwise
+- `caseStudy` — optional extra headed notes
+
+A Z Lab game is an entry in `GAMES` in the same file (its thumbnail in
+`public/`); it plays inside the desktop in an iframe from the Z Lab site.
 
 Images go in `public/` and are referenced by filename alone, no leading
 slash.
 
 ## What not to touch without being asked
 
-The portal intro, the rune field and the colour variables in
-`globals.css` are the design. Changing spacing or type there to make a
-new project fit is the wrong end of the problem — change the data.
+The colour variables and the pixel look in `globals.css` are the design.
+Changing spacing or type there to make a new project fit is the wrong end
+of the problem — change the data.
 
 ## Checking the work
 
-`npm run dev` and look at it. There are no tests here; the check is the
-page. A change that cannot be seen on the page is a change nobody asked
-for.
+`npm run dev` and look at it, on a laptop width and a phone width. There
+are no tests here; the check is the page.
