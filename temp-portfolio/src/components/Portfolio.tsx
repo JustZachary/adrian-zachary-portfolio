@@ -187,7 +187,8 @@ export default function Portfolio() {
           <a href="/desktop" className="pf-secret">Psst: there is a retro desktop version of this site →</a>
         </div>
       </footer>
-      <CaseFile project={project} onClose={() => setProject(null)} />
+      <CaseFile project={project} onClose={() => setProject(null)}
+        onNav={(d) => setProject((cur) => cur && PROJECTS[(PROJECTS.indexOf(cur) + d + PROJECTS.length) % PROJECTS.length])} />
       <GameWindow game={game} onClose={() => setGame(null)} />
       {party && <Confetti />}
       <button type="button" className={"pf-top" + (progress > 0.12 ? " show" : "")} onClick={() => scrollToId("top")} aria-label="Back to top">
@@ -525,7 +526,7 @@ function Card({ p, i, onOpen }: { p: Project; i: number; onOpen: () => void }) {
   return (
     <button ref={el} type="button" className="pf-card" data-reveal style={{ ["--i" as string]: i % 3 }} onClick={onOpen} onPointerMove={tilt} onPointerLeave={flat}>
       <span className="pf-card-top" style={{ background: `var(--t${PROJECTS.indexOf(p) % 4})` }}>
-        {p.images?.length ? <img src={"/" + p.images[0]} alt="" className={p.imageShape === "phone" ? "pf-phone" : ""} /> : <PixelIcon name={p.icon} size={64} />}
+        {p.images?.length ? <img src={"/" + p.images[0]} alt="" className={p.imageShape === "phone" ? "pf-phone" : ""} /> : <Scene icon={p.icon} />}
         <span className="pf-kind">{p.kind}</span>
       </span>
       <span className="pf-card-body">
@@ -536,6 +537,55 @@ function Card({ p, i, onOpen }: { p: Project; i: number; onOpen: () => void }) {
       </span>
     </button>
   );
+}
+
+/* Little animated scenes of what each internal tool does, for the projects that have
+   no screenshots. Drawn, not captured: nothing here is real data. Any other icon
+   falls back to the pixel icon. */
+function Scene({ icon }: { icon: Project["icon"] }) {
+  if (icon === "tower") {
+    const rows = [["68%", "Supply of laptops"], ["52%", "Network upgrade"], ["74%", "Cloud backup"], ["46%", "CCTV system"], ["60%", "Software licences"], ["40%", "Data centre"]];
+    return (
+      <span className="sc sc-tender" aria-hidden="true">
+        <span className="sc-win"><b>tenders · today<em>NEW 3</em></b>
+          <span className="sc-rows"><span className="sc-roll">
+            {[...rows, ...rows].map(([w, t], i) => <span key={i} className="sc-row"><i />{t}<s style={{ width: w }} /></span>)}
+          </span></span>
+        </span>
+      </span>
+    );
+  }
+  if (icon === "chat") {
+    return (
+      <span className="sc sc-chat" aria-hidden="true">
+        <span className="sc-phone">
+          <span className="sc-b in" style={{ ["--k" as string]: 0 }}>Ada pakej untuk syarikat kecil?</span>
+          <span className="sc-b out" style={{ ["--k" as string]: 1 }}>Ada! Team kami akan follow up dengan butiran 👋</span>
+          <span className="sc-b in" style={{ ["--k" as string]: 2 }}>Ok terima kasih</span>
+          <span className="sc-typing" style={{ ["--k" as string]: 3 }}><i /><i /><i /></span>
+        </span>
+      </span>
+    );
+  }
+  if (icon === "door") {
+    return (
+      <span className="sc sc-portal" aria-hidden="true">
+        <span className="sc-card"><b>Sign in · workspaces</b>
+          <span className="sc-grid">{["Mfinity", "Ikhlas", "Mlabs", "Swapp"].map((n, i) => <span key={n} style={{ ["--k" as string]: i }}>{n}</span>)}</span>
+        </span>
+        <span className="sc-cursor" />
+      </span>
+    );
+  }
+  if (icon === "post") {
+    return (
+      <span className="sc sc-post" aria-hidden="true">
+        {["IG", "FB", "TT", "TH"].map((n, i) => <span key={n} className="sc-p" style={{ ["--k" as string]: i }}>{n}<i /><i /></span>)}
+        <span className="sc-idea">💡 one idea</span>
+      </span>
+    );
+  }
+  return <PixelIcon name={icon} size={64} />;
 }
 
 /* A native <dialog>: Esc closes it, focus stays inside, the page behind is inert. */
@@ -555,15 +605,27 @@ function Modal({ open, onClose, label, wide, children }: { open: boolean; onClos
   );
 }
 
-function CaseFile({ project: p, onClose }: { project: Project | null; onClose: () => void }) {
+function CaseFile({ project: p, onClose, onNav }: { project: Project | null; onClose: () => void; onNav: (d: number) => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const nav = useRef(onNav);
+  useEffect(() => { nav.current = onNav; });
+  useEffect(() => { box.current?.scrollTo(0, 0); }, [p]);   // each project opens at its top
+  const open = !!p;
+  useEffect(() => {   // ← and → step through the projects
+    if (!open) return;
+    const key = (e: KeyboardEvent) => { if (e.key === "ArrowRight") nav.current(1); if (e.key === "ArrowLeft") nav.current(-1); };
+    addEventListener("keydown", key);
+    return () => removeEventListener("keydown", key);
+  }, [open]);
+  const n = p ? PROJECTS.indexOf(p) : 0;
   return (
     <Modal open={!!p} onClose={onClose} label={p ? p.title : "Project"}>
       {p && (
         <div className="pf-win">
           <div className="pf-win-bar"><i /><i /><i /><span>{p.slug}.txt</span>
             <button type="button" className="pf-x" onClick={onClose} aria-label="Close">✕</button></div>
-          <div className="pf-case">
-            <p className="pf-kicker">{p.kind}</p>
+          <div className="pf-case" ref={box}>
+            <p className="pf-kicker">{p.kind} · {n + 1} of {PROJECTS.length}</p>
             <h3>{p.title}</h3>
             <p className="pf-case-blurb">{p.blurb}</p>
             {p.badges && <p className="pf-tags">{p.badges.map((b) => <i key={b} className="hl">{b}</i>)}</p>}
@@ -583,6 +645,11 @@ function CaseFile({ project: p, onClose }: { project: Project | null; onClose: (
             )}
             <p className="pf-tags">{p.tech.map((t) => <i key={t}>{t}</i>)}</p>
             {p.links && <p className="pf-links">{p.links.map((l) => <a key={l.href} href={l.href} target="_blank" rel="noopener">{l.label} ↗</a>)}</p>}
+            <div className="pf-case-nav">
+              <button type="button" className="pf-btn small" onClick={() => onNav(-1)}>← {PROJECTS[(n - 1 + PROJECTS.length) % PROJECTS.length].title}</button>
+              <span className="pf-case-hint">← → keys work too</span>
+              <button type="button" className="pf-btn small" onClick={() => onNav(1)}>{PROJECTS[(n + 1) % PROJECTS.length].title} →</button>
+            </div>
           </div>
         </div>
       )}
@@ -591,15 +658,51 @@ function CaseFile({ project: p, onClose }: { project: Project | null; onClose: (
 }
 
 /* --------------------------------------------------------------- experience */
+/* The timeline: a dashed track through the centre of every marker, a solid line that
+   fills down it as you scroll (to the middle of the screen), and each marker lights up
+   as the line reaches it. The first entry, the current job, pulses. */
+function useTimeline() {
+  const ol = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const list = ol.current;
+    if (!list) return;
+    const items = [...list.querySelectorAll<HTMLElement>(":scope > li")];
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let top = 0, len = 0, raf = 0;
+    const measure = () => {   // from the first marker's centre to the last one's
+      const r = list.getBoundingClientRect();
+      const c = items.map((li) => li.getBoundingClientRect().top - r.top + 13);
+      top = c[0]; len = c[c.length - 1] - c[0];
+      list.style.setProperty("--t0", top + "px");
+      list.style.setProperty("--len", len + "px");
+      update();
+    };
+    const update = () => {
+      raf = 0;
+      const r = list.getBoundingClientRect(), at = innerHeight * 0.55 - r.top - top;
+      const p = still ? 1 : Math.min(1, Math.max(0, at / Math.max(1, len)));
+      list.style.setProperty("--p", p.toFixed(4));
+      items.forEach((li, i) => li.classList.toggle("lit", still || at >= (i === 0 ? 0 : li.offsetTop + 13 - top) - 1));
+    };
+    const on = () => { if (!raf) raf = requestAnimationFrame(update); };
+    measure();
+    const ro = new ResizeObserver(measure); ro.observe(list);
+    addEventListener("scroll", on, { passive: true });
+    return () => { ro.disconnect(); removeEventListener("scroll", on); cancelAnimationFrame(raf); };
+  }, []);
+  return ol;
+}
+
 function Experience() {
+  const tl = useTimeline();
   return (
     <section id="experience" className="pf-sec pf-alt">
       <div className="pf-wrap">
         <SecHead n="02" title="Experience & education" />
         <div className="pf-two">
-          <ol className="pf-timeline" data-reveal>
-            {EXPERIENCE.map((j) => (
-              <li key={j.org + j.role} data-reveal>
+          <ol className="pf-timeline" ref={tl}>
+            {EXPERIENCE.map((j, i) => (
+              <li key={j.org + j.role} data-reveal className={i === 0 ? "now" : undefined}>
                 <p className="pf-when">{j.when} · {j.place}</p>
                 <h3>{j.role}</h3>
                 <p className="pf-org">{j.org}</p>
@@ -694,6 +797,7 @@ function Contact() {
             <div>
               <h2>Let&rsquo;s talk.</h2>
               <p>The quickest way to reach me is email. I usually reply within a day.</p>
+              <LocalTime />
               <p className="pf-email">{PROFILE.email}</p>
             </div>
             <div className="pf-contact-btns">
@@ -707,6 +811,18 @@ function Contact() {
       </div>
     </section>
   );
+}
+
+/* "It's 4:32 pm in Petaling Jaya", ticking, for people writing from another time zone. */
+function LocalTime() {
+  const [now, setNow] = useState("");
+  useEffect(() => {
+    const fmt = new Intl.DateTimeFormat("en-MY", { timeZone: "Asia/Kuala_Lumpur", hour: "numeric", minute: "2-digit", weekday: "short" });
+    const tick = () => setNow(fmt.format(new Date()));
+    const first = setTimeout(tick, 0), t = setInterval(tick, 20000);
+    return () => { clearTimeout(first); clearInterval(t); };
+  }, []);
+  return <p className="pf-clock" aria-live="off"><i aria-hidden="true" />{now ? `It's ${now} in Petaling Jaya (GMT+8)` : "Petaling Jaya, GMT+8"}</p>;
 }
 
 function SecHead({ n, title, sub, light }: { n: string; title: string; sub?: string; light?: boolean }) {
