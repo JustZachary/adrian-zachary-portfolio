@@ -7,6 +7,8 @@
 
 export const PROFILE = {
   name: "Adrian Zachary",
+  /* What the big hello calls you: "Hi, I'm Zach." Use "Zachary" for the longer one. */
+  nickname: "Zach",
   role: "Software engineer",
   location: "Petaling Jaya, Malaysia",
   /* One sentence under the name. Keep it about what you do, not adjectives. */
@@ -18,7 +20,7 @@ export const PROFILE = {
   github: "https://github.com/JustZachary",
   linkedin: "https://www.linkedin.com/in/adrian-zachary-ian-2a4748181/",
   resume: "/adrian_zachary_resume.pdf",
-  photo: "/my_picture.jpg",
+  photo: "/my_picture.webp",
   /* The colour theme visitors see first: "sunset" or "holo". They can flip it with the
      round button in the top bar. The favicon files in src/app/ are drawn for one theme. */
   theme: "sunset" as "sunset" | "holo",

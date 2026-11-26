@@ -117,7 +117,7 @@ export const PROJECTS: Project[] = [
       { title: "Outcome", body: "A cleaner, more user-friendly way to read environmental information on a phone." },
     ],
     tech: ["Flutter", "Firebase", "Google Maps", "Air Quality API"],
-    images: ["smartairiq-1.jpeg", "smartairiq-2.jpeg", "smartairiq-3.jpeg", "smartairiq-4.jpeg"],
+    images: ["smartairiq-1.webp", "smartairiq-2.webp", "smartairiq-3.webp", "smartairiq-4.webp"],
     imageShape: "phone",
     caseStudy: [
       { title: "Project goal", body: "Give people a simple mobile interface for air quality, location-based monitoring and basic precaution guidance." },
@@ -142,7 +142,7 @@ export const PROJECTS: Project[] = [
     ],
     tech: ["PHP", "MySQL", "AI integration", "API"],
     badges: ["Enterprise project", "Internship"],
-    images: ["ai-recruitment.png"],
+    images: ["ai-recruitment.webp"],
     imageShape: "wide",
   },
 ];

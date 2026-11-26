@@ -170,15 +170,39 @@ export default function Portfolio() {
   useSmoothScroll(reduce);
   useReveal();
   const progress = useScrollProgress();
+  const [palette, setPalette] = useState(false);
+  useEffect(() => {   // Ctrl/Cmd+K, or "/" when not typing, opens the quick search
+    const key = (e: KeyboardEvent) => {
+      const typing = (e.target as HTMLElement)?.closest?.("input, textarea, [contenteditable]");
+      if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || (e.key === "/" && !typing && !e.metaKey && !e.ctrlKey)) {
+        if (document.querySelector("dialog[open]:not(.pf-pal-dlg)")) return;
+        e.preventDefault(); setPalette((o) => !o);
+      }
+    };
+    addEventListener("keydown", key);
+    return () => removeEventListener("keydown", key);
+  }, []);
+  const later = (f: () => void) => () => { setPalette(false); setTimeout(f, 60); };
+  const commands: Cmd[] = [
+    ...SECTIONS.map(([id, label]) => ({ group: "Go to", label: id === "top" ? "Top of the page" : label, hint: "section", run: later(() => scrollToId(id)) })),
+    ...PROJECTS.map((p) => ({ group: "Projects", label: p.title, hint: p.kind + " · " + p.tech.join(" "), run: later(() => setProject(p)) })),
+    ...GAMES.map((g) => ({ group: "Play", label: g.title, hint: g.tech + " · game", run: later(() => setGame(g)) })),
+    { group: "Do", label: "Download my CV", hint: "resume pdf", run: later(() => { const a = document.createElement("a"); a.href = PROFILE.resume; a.download = ""; a.click(); }) },
+    { group: "Do", label: "Copy my email", hint: PROFILE.email, run: later(() => { navigator.clipboard?.writeText(PROFILE.email).catch(() => { location.href = "mailto:" + PROFILE.email; }); }) },
+    { group: "Do", label: "Open LinkedIn", hint: "profile", run: later(() => window.open(PROFILE.linkedin, "_blank", "noopener")) },
+    { group: "Do", label: "Open GitHub", hint: "code", run: later(() => window.open(PROFILE.github, "_blank", "noopener")) },
+    { group: "Do", label: theme === "sunset" ? "Switch to Holo colours" : "Switch to Sunset colours", hint: "theme", run: later(() => themeStore.set(theme === "sunset" ? "holo" : "sunset")) },
+    { group: "Do", label: "Open the retro desktop", hint: "az-os easter egg", run: later(() => window.location.assign("/desktop")) },
+  ];
 
   return (
     <div className={`pf theme-${theme}`}>
-      <TopBar seen={seen} current={current} theme={theme} progress={progress} />
+      <TopBar seen={seen} current={current} theme={theme} progress={progress} onSearch={() => setPalette(true)} />
       <Hero reduce={reduce} live={live} />
       <Stats />
       <Work onOpen={setProject} />
       <Experience />
-      <Skills />
+      <Skills onProject={setProject} onGame={setGame} />
       <Play onPlay={setGame} />
       <Contact />
       <footer className="pf-foot">
@@ -190,6 +214,7 @@ export default function Portfolio() {
       <CaseFile project={project} onClose={() => setProject(null)}
         onNav={(d) => setProject((cur) => cur && PROJECTS[(PROJECTS.indexOf(cur) + d + PROJECTS.length) % PROJECTS.length])} />
       <GameWindow game={game} onClose={() => setGame(null)} />
+      <Palette open={palette} onClose={() => setPalette(false)} commands={commands} />
       {party && <Confetti />}
       <button type="button" className={"pf-top" + (progress > 0.12 ? " show" : "")} onClick={() => scrollToId("top")} aria-label="Back to top">
         <span aria-hidden="true">▲</span>
@@ -253,7 +278,7 @@ function Splash({ theme, onDone }: { theme: Theme; onDone: () => void }) {
 }
 
 /* ------------------------------------------------------------------ top bar */
-function TopBar({ seen, current, theme, progress }: { seen: Set<string>; current: string; theme: Theme; progress: number }) {
+function TopBar({ seen, current, theme, progress, onSearch }: { seen: Set<string>; current: string; theme: Theme; progress: number; onSearch: () => void }) {
   const n = seen.size, all = n === SECTIONS.length;
   const [menu, setMenu] = useState(false);
   const bar = useRef<HTMLElement>(null);
@@ -283,6 +308,9 @@ function TopBar({ seen, current, theme, progress }: { seen: Set<string>; current
           </span>
           <span className="pf-xp-label">{all ? "100%!" : `${Math.round((n / SECTIONS.length) * 100)}%`}</span>
         </div>
+        <button type="button" className="pf-search" onClick={onSearch} title="Quick search (Ctrl/⌘ K or /)">
+          <span aria-hidden="true">⌕</span><span className="pf-search-l">Search</span><kbd>/</kbd>
+        </button>
         <button type="button" className="pf-theme" onClick={() => themeStore.set(theme === "sunset" ? "holo" : "sunset")}
           title={theme === "sunset" ? "Switch to the holo pastel colours" : "Switch to the sunset colours"}
           aria-label={`Colour theme: ${theme}. Switch theme`}><i /></button>
@@ -298,6 +326,7 @@ function TopBar({ seen, current, theme, progress }: { seen: Set<string>; current
             <span className="pf-num">{String(i + 1).padStart(2, "0")}</span>{label}{seen.has(id) && <em aria-label="seen">✓</em>}
           </a>
         ))}
+        <button type="button" className="pf-menu-search" onClick={() => { setMenu(false); onSearch(); }}><span className="pf-num">⌕</span>Search everything</button>
       </nav>
     </header>
   );
@@ -327,8 +356,8 @@ function Hero({ reduce, live }: { reduce: boolean; live: boolean }) {
       </div>
       <div className="pf-wrap pf-hero-in">
         <div className="pf-hero-copy" data-hero>
-          <p className="pf-kicker">{PROFILE.role} · {PROFILE.location}</p>
-          <h1>Hi, I&rsquo;m {PROFILE.name.split(" ")[0]}.<span className="pf-cursor" aria-hidden="true" /></h1>
+          <p className="pf-kicker">{PROFILE.name} · {PROFILE.role} · {PROFILE.location.split(",")[0]}</p>
+          <h1>Hi, I&rsquo;m {PROFILE.nickname}.<span className="pf-cursor" aria-hidden="true" /></h1>
           <p className="pf-lede">{PROFILE.intro}</p>
           {PROFILE.availability && <p className="pf-avail"><i aria-hidden="true" />{PROFILE.availability}</p>}
           <div className="pf-ctas">
@@ -526,7 +555,7 @@ function Card({ p, i, onOpen }: { p: Project; i: number; onOpen: () => void }) {
   return (
     <button ref={el} type="button" className="pf-card" data-reveal style={{ ["--i" as string]: i % 3 }} onClick={onOpen} onPointerMove={tilt} onPointerLeave={flat}>
       <span className="pf-card-top" style={{ background: `var(--t${PROJECTS.indexOf(p) % 4})` }}>
-        {p.images?.length ? <img src={"/" + p.images[0]} alt="" className={p.imageShape === "phone" ? "pf-phone" : ""} /> : <Scene icon={p.icon} />}
+        {p.images?.length ? <img src={"/" + p.images[0]} alt="" loading="lazy" decoding="async" className={p.imageShape === "phone" ? "pf-phone" : ""} /> : <Scene icon={p.icon} />}
         <span className="pf-kind">{p.kind}</span>
       </span>
       <span className="pf-card-body">
@@ -589,7 +618,7 @@ function Scene({ icon }: { icon: Project["icon"] }) {
 }
 
 /* A native <dialog>: Esc closes it, focus stays inside, the page behind is inert. */
-function Modal({ open, onClose, label, wide, children }: { open: boolean; onClose: () => void; label: string; wide?: boolean; children: React.ReactNode }) {
+function Modal({ open, onClose, label, wide, cls, children }: { open: boolean; onClose: () => void; label: string; wide?: boolean; cls?: string; children: React.ReactNode }) {
   const d = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const el = d.current!;
@@ -598,7 +627,7 @@ function Modal({ open, onClose, label, wide, children }: { open: boolean; onClos
     if (!open) lenis?.start();
   }, [open]);
   return (
-    <dialog ref={d} data-lenis-prevent className={"pf-modal" + (wide ? " wide" : "")} aria-label={label} onClose={onClose}
+    <dialog ref={d} data-lenis-prevent className={"pf-modal" + (wide ? " wide" : "") + (cls ? " " + cls : "")} aria-label={label} onClose={onClose}
       onClick={(e) => { if (e.target === d.current) onClose(); }}>
       {open && children}
     </dialog>
@@ -730,16 +759,50 @@ function Experience() {
 }
 
 /* ------------------------------------------------------------------- skills */
-function Skills() {
+/* Where each skill was used: a skill matches a project, job or game when their tech
+   lists name it ("LLM APIs" matches "LLM API", "Cron jobs" matches "Cron"). */
+type Use = { label: string; run: () => void };
+const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9+#]/g, "");
+const matches = (skill: string, tech: string) => { const a = norm(skill), b = norm(tech); return !!b && (a === b || (b.length >= 4 && a.startsWith(b))); };
+function Skills({ onProject, onGame }: { onProject: (p: Project) => void; onGame: (g: Game) => void }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => { if (!(e.target as Element).closest?.(".pf-slot-wrap")) setOpen(null); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(null); };
+    addEventListener("pointerdown", away); addEventListener("keydown", esc);
+    return () => { removeEventListener("pointerdown", away); removeEventListener("keydown", esc); };
+  }, [open]);
+  const usesOf = (skill: string): Use[] => [
+    ...PROJECTS.filter((p) => p.tech.some((t) => matches(skill, t))).map((p) => ({ label: p.title, run: () => { setOpen(null); onProject(p); } })),
+    ...EXPERIENCE.filter((j) => j.tech?.some((t) => matches(skill, t))).map((j) => ({ label: j.org.split(" (")[0], run: () => { setOpen(null); scrollToId("experience"); } })),
+    ...GAMES.filter((g) => g.tech.split("·").some((t) => matches(skill, t))).map((g) => ({ label: g.title, run: () => { setOpen(null); onGame(g); } })),
+  ];
   return (
     <section id="skills" className="pf-sec">
       <div className="pf-wrap">
-        <SecHead n="03" title="Skills" sub="What I use, grouped the way a job ad lists them." />
-        <div className="pf-skills">
+        <SecHead n="03" title="Skills" sub="What I use, grouped the way a job ad lists them. Tap a skill with a dot to see where I used it." />
+        <div className="pf-skills" ref={box}>
           {SKILLS.map((g, i) => (
             <div key={g.group} className="pf-skill" data-reveal style={{ ["--i" as string]: i % 3 }}>
               <b>{g.group}</b>
-              <div className="pf-slots">{g.items.map((s) => <span key={s}>{s}</span>)}</div>
+              <div className="pf-slots">{g.items.map((sk) => {
+                const uses = usesOf(sk);
+                if (!uses.length) return <span key={sk}>{sk}</span>;
+                const on = open === sk;
+                return (
+                  <span key={sk} className={"pf-slot-wrap" + (on ? " on" : "")}>
+                    <button type="button" className="pf-slot" aria-expanded={on} onClick={() => setOpen(on ? null : sk)}>{sk}<i aria-hidden="true" /></button>
+                    {on && (
+                      <span className="pf-uses" role="group" aria-label={`Where I used ${sk}`}>
+                        <small>Used in</small>
+                        {uses.map((u) => <button key={u.label} type="button" onClick={u.run}>{u.label} →</button>)}
+                      </span>
+                    )}
+                  </span>
+                );
+              })}</div>
             </div>
           ))}
         </div>
@@ -782,6 +845,47 @@ function GameWindow({ game, onClose }: { game: Game | null; onClose: () => void 
           <iframe src={url} title={game.title} allow="autoplay; fullscreen; gamepad" />
         </div>
       )}
+    </Modal>
+  );
+}
+
+/* ------------------------------------------------------------ quick search
+   Ctrl/Cmd+K or "/": type to jump to a section, open a project or game, or grab the CV. */
+type Cmd = { group: string; label: string; hint: string; run: () => void };
+function Palette({ open, onClose, commands }: { open: boolean; onClose: () => void; commands: Cmd[] }) {
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState(0);
+  const input = useRef<HTMLInputElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = commands.filter((c) => { const h = (c.label + " " + c.hint + " " + c.group).toLowerCase(); return words.every((w) => h.includes(w)); });
+  useEffect(() => { if (open) setTimeout(() => input.current?.focus(), 30); }, [open]);
+  useEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" }); }, [sel]);
+  const close = () => { setQ(""); setSel(0); onClose(); };
+  const key = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setSel((s) => Math.min(shown.length - 1, s + 1)); }
+    if (e.key === "ArrowUp") { e.preventDefault(); setSel((s) => Math.max(0, s - 1)); }
+    if (e.key === "Enter" && shown[sel]) { e.preventDefault(); const c = shown[sel]; setQ(""); setSel(0); c.run(); }
+  };
+  return (
+    <Modal open={open} onClose={close} label="Quick search" cls="pf-pal-dlg">
+      <div className="pf-win pf-pal">
+        <div className="pf-win-bar"><i /><i /><i /><span>search.exe</span><button type="button" className="pf-x" onClick={close} aria-label="Close">✕</button></div>
+        <label className="pf-pal-in"><span aria-hidden="true">⌕</span>
+          <input ref={input} value={q} onChange={(e) => { setQ(e.target.value); setSel(0); }} onKeyDown={key} placeholder="Type a section, project, game or 'cv'…"
+            aria-label="Search" role="combobox" aria-expanded="true" aria-controls="pf-pal-list" aria-activedescendant={shown[sel] ? `pal-${sel}` : undefined} />
+        </label>
+        <ul className="pf-pal-list" id="pf-pal-list" role="listbox" ref={list}>
+          {shown.map((c, i) => (
+            <li key={c.group + c.label} id={`pal-${i}`} role="option" aria-selected={i === sel} onMouseMove={() => setSel(i)} onClick={() => { setQ(""); setSel(0); c.run(); }}>
+              {(i === 0 || shown[i - 1].group !== c.group) && <small className="pf-pal-g">{c.group}</small>}
+              <span className="pf-pal-row"><b>{c.label}</b><em>{c.group === "Projects" || c.group === "Play" ? c.hint.split(" · ")[0] : c.group === "Go to" ? "section" : ""}</em><kbd>↵</kbd></span>
+            </li>
+          ))}
+          {!shown.length && <li className="pf-pal-none">Nothing matches &ldquo;{q}&rdquo;. Try &ldquo;cv&rdquo;, &ldquo;email&rdquo; or a project name.</li>}
+        </ul>
+        <p className="pf-pal-foot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></p>
+      </div>
     </Modal>
   );
 }
