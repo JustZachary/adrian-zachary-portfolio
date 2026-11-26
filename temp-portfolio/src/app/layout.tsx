@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "lenis/dist/lenis.css";
+import { PROFILE } from "../data/profile";
 import "./globals.css";
 import "./portfolio.css";
 
@@ -25,8 +26,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" suppressHydrationWarning>
       <head>
         {/* Before the first paint: skip the splash for repeat views this visit and for reduced motion,
-            and switch on the scroll-in animations (pf-anim) unless motion is reduced. */}
-        <script dangerouslySetInnerHTML={{ __html: "try{var d=document.documentElement,r=matchMedia('(prefers-reduced-motion: reduce)').matches;if(!r)d.classList.add('pf-anim');if(r||sessionStorage.getItem('pf-splash'))d.setAttribute('data-splash','skip')}catch(e){}" }} />
+            switch on the scroll-in animations (pf-anim) unless motion is reduced, and set the colour theme. */}
+        <script dangerouslySetInnerHTML={{ __html: "try{var d=document.documentElement,r=matchMedia('(prefers-reduced-motion: reduce)').matches,t=null;try{t=localStorage.getItem('pf-theme')}catch(e){}if(['sunset','holo','night'].indexOf(t)<0)t=matchMedia('(prefers-color-scheme: dark)').matches?'night':'" + PROFILE.theme + "';d.setAttribute('data-pf-theme',t);d.style.background={sunset:'#FFF4EA',holo:'#FBF9FF',night:'#12142B'}[t];if(!r)d.classList.add('pf-anim');if(r||sessionStorage.getItem('pf-splash'))d.setAttribute('data-splash','skip')}catch(e){}" }} />
         <link rel="preload" as="image" href="/splash-sunset.webp" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />

@@ -25,18 +25,35 @@ const SECTIONS = [
   ["contact", "Contact"],
 ] as const;
 
-/* The colour theme, remembered per visitor. A tiny store so the server render and the
-   first client render agree, and every reader updates together when it changes. */
-type Theme = "sunset" | "holo";
+/* The colour theme. A visitor's own pick is remembered; without one, people whose
+   computer is in dark mode get Night and everyone else gets PROFILE.theme. The theme
+   sits on <html data-pf-theme> (set before the first paint by layout.tsx), so the
+   right colours show straight away. */
+type Theme = "sunset" | "holo" | "night";
+const THEMES: Theme[] = ["sunset", "holo", "night"];
+const THEME_NAME: Record<Theme, string> = { sunset: "Sunset", holo: "Holo pastel", night: "Night" };
+const THEME_BG: Record<Theme, string> = { sunset: "#FFF4EA", holo: "#FBF9FF", night: "#12142B" };
+const nextTheme = (t: Theme) => THEMES[(THEMES.indexOf(t) + 1) % THEMES.length];
 const themeListeners = new Set<() => void>();
 const themeStore = {
   get(): Theme {
-    try { const t = localStorage.getItem("pf-theme"); if (t === "sunset" || t === "holo") return t; } catch {}
+    try { const t = localStorage.getItem("pf-theme") as Theme; if (THEMES.includes(t)) return t; } catch {}
+    try { if (matchMedia("(prefers-color-scheme: dark)").matches) return "night"; } catch {}
     return PROFILE.theme;
   },
-  set(t: Theme) { try { localStorage.setItem("pf-theme", t); } catch {} themeListeners.forEach((l) => l()); },
-  sub(l: () => void) { themeListeners.add(l); return () => { themeListeners.delete(l); }; },
+  set(t: Theme) {
+    try { localStorage.setItem("pf-theme", t); } catch {}
+    document.documentElement.dataset.pfTheme = t;
+    themeListeners.forEach((l) => l());
+  },
+  sub(l: () => void) {
+    themeListeners.add(l);
+    const mq = matchMedia("(prefers-color-scheme: dark)"); mq.addEventListener("change", l);
+    return () => { themeListeners.delete(l); mq.removeEventListener("change", l); };
+  },
 };
+/* the logo and splash art: Night uses the Sunset renders, which read well on dark */
+const art = (t: Theme) => (t === "holo" ? "holo" : "sunset");
 function useTheme() {
   return useSyncExternalStore(themeStore.sub, themeStore.get, () => PROFILE.theme);
 }
@@ -163,7 +180,10 @@ export default function Portfolio() {
   });
   const theme = useTheme();
   // the page behind the page (overscroll, the strip under the phone toolbar) follows the theme
-  useEffect(() => { document.documentElement.style.background = theme === "holo" ? "#FBF9FF" : "#FFF4EA"; }, [theme]);
+  useEffect(() => {   // the page behind the page and the phone's browser bar follow the theme
+    const d = document.documentElement; d.dataset.pfTheme = theme; d.style.background = THEME_BG[theme];
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_BG[theme]);
+  }, [theme]);
   const [project, setProject] = useState<Project | null>(null);
   const [game, setGame] = useState<Game | null>(null);
   const [live, setLive] = useState(false);   // the splash has gone: start the hero's entrance
@@ -191,7 +211,7 @@ export default function Portfolio() {
     { group: "Do", label: "Copy my email", hint: PROFILE.email, run: later(() => { navigator.clipboard?.writeText(PROFILE.email).catch(() => { location.href = "mailto:" + PROFILE.email; }); }) },
     { group: "Do", label: "Open LinkedIn", hint: "profile", run: later(() => window.open(PROFILE.linkedin, "_blank", "noopener")) },
     { group: "Do", label: "Open GitHub", hint: "code", run: later(() => window.open(PROFILE.github, "_blank", "noopener")) },
-    { group: "Do", label: theme === "sunset" ? "Switch to Holo colours" : "Switch to Sunset colours", hint: "theme", run: later(() => themeStore.set(theme === "sunset" ? "holo" : "sunset")) },
+    ...THEMES.filter((t) => t !== theme).map((t) => ({ group: "Do", label: `Switch to ${THEME_NAME[t]} colours`, hint: "theme dark light mode", run: later(() => themeStore.set(t)) })),
     { group: "Do", label: "Open the retro desktop", hint: "az-os easter egg", run: later(() => window.location.assign("/desktop")) },
   ];
 
@@ -268,7 +288,7 @@ function Splash({ theme, onDone }: { theme: Theme; onDone: () => void }) {
       </div>
       <div className="pf-splash-in">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`/splash-${theme}.webp`} width={260} height={260} alt="" />
+        <img src={`/splash-${art(theme)}.webp`} width={260} height={260} alt="" />
         <p className="pf-splash-name">{PROFILE.name}</p>
         <p className="pf-splash-sub">{PROFILE.role}</p>
       </div>
@@ -294,7 +314,7 @@ function TopBar({ seen, current, theme, progress, onSearch }: { seen: Set<string
       <div className="pf-wrap pf-bar-in">
         <a className="pf-brand" href="#top" aria-label={`${PROFILE.name}, back to top`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="pf-mark" src={`/logo-${theme}.png`} alt="" width={40} height={40} />
+          <img className="pf-mark" src={`/logo-${art(theme)}.png`} alt="" width={40} height={40} />
           <span className="pf-brand-name">{PROFILE.name}</span>
         </a>
         <nav className="pf-nav" aria-label="Sections">
@@ -311,9 +331,9 @@ function TopBar({ seen, current, theme, progress, onSearch }: { seen: Set<string
         <button type="button" className="pf-search" onClick={onSearch} title="Quick search (Ctrl/⌘ K or /)">
           <span aria-hidden="true">⌕</span><span className="pf-search-l">Search</span><kbd>/</kbd>
         </button>
-        <button type="button" className="pf-theme" onClick={() => themeStore.set(theme === "sunset" ? "holo" : "sunset")}
-          title={theme === "sunset" ? "Switch to the holo pastel colours" : "Switch to the sunset colours"}
-          aria-label={`Colour theme: ${theme}. Switch theme`}><i /></button>
+        <button type="button" className="pf-theme" onClick={() => themeStore.set(nextTheme(theme))}
+          title={`Colours: ${THEME_NAME[theme]}. Switch to ${THEME_NAME[nextTheme(theme)]}`}
+          aria-label={`Colour theme: ${THEME_NAME[theme]}. Switch to ${THEME_NAME[nextTheme(theme)]}`}><i /></button>
         <a className="pf-btn pf-btn-ink small" href={PROFILE.resume} download>CV ↓</a>
         <button type="button" className="pf-menu-btn" aria-expanded={menu} aria-controls="pf-menu" onClick={() => setMenu((m) => !m)}>
           <span aria-hidden="true" className={menu ? "x" : ""}><i /><i /><i /></span><span className="pf-sr">Sections menu</span>
