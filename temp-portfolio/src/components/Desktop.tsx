@@ -293,7 +293,7 @@ function About() {
       <div className="about-text">
         <h1 className="hello">hi, i&apos;m adrian.</h1>
         <p className="tagline">i build <span className="hl">useful</span> software and <span className="blue">playable</span> worlds.</p>
-        <p>Software engineer from UKM, based in Petaling Jaya. By day I build automation and AI tools for the mlabs group of companies: crawlers, AI assistants, staff portals. In the evenings I make little games you can play in a browser tab. Pursuing AWS Solutions Architect Associate.</p>
+        <p>Software engineer from UKM, based in Petaling Jaya. By day I build automation and AI tools for the Mlabs Group of companies: crawlers, AI assistants, staff portals. In the evenings I make little games you can play in a browser tab. Pursuing AWS Solutions Architect Associate.</p>
         <div className="row">
           <a className="pbtn sun" href={RESUME} target="_blank" rel="noopener">resume.pdf</a>
           <a className="pbtn" href={GITHUB} target="_blank" rel="noopener">github</a>

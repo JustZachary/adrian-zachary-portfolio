@@ -26,7 +26,7 @@ export const PROFILE = {
 
 /* The 30-second version, top of the page. One line each. */
 export const QUICK_FACTS: { label: string; value: string }[] = [
-  { label: "Now", value: "Automation & AI tools for the mlabs group of companies" },
+  { label: "Now", value: "Automation & AI tools for the Mlabs Group of companies" },
   { label: "Degree", value: "B.SE (Information Systems), UKM 2026 · CGPA 3.31 · Dean's List ×2" },
   { label: "Internship", value: "Junior PHP Developer, SAINS · 5 months" },
   { label: "Stack", value: "TypeScript, React / Next.js, Node.js, PHP, SQL, Flutter" },
@@ -38,7 +38,7 @@ export type Job = { role: string; org: string; place: string; when: string; poin
 export const EXPERIENCE: Job[] = [
   {
     role: "Software engineer, automation & AI", // CHECK: exact title
-    org: "mlabs group (mfinity · ikhlas · mlabs · Swapp Asia)",
+    org: "Mlabs Group (Mfinity · Ikhlas · Mlabs · Swapp Asia)",
     place: "Petaling Jaya",
     when: "2026 – now", // CHECK: start month
     points: [
