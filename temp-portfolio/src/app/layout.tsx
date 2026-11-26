@@ -8,13 +8,16 @@ export const metadata: Metadata = {
   description:
     "Software engineer in Petaling Jaya. Automation and AI tools at work, browser games after hours. Projects, experience, skills, CV and contact on one page.",
   openGraph: {
+    type: "website",
+    url: "/",
     title: "Adrian Zachary · Software Engineer",
-    description: "Automation and AI tools by day, playable browser games by night.",
-    images: ["/wick.webp"],
+    description: "Automation and AI tools at work, browser games after hours. Projects, experience, CV and contact.",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Adrian Zachary, software engineer in Petaling Jaya" }],
   },
+  twitter: { card: "summary_large_image", images: ["/og.png"] },
 };
 
-export const viewport: Viewport = { themeColor: "#FFF8EC" };
+export const viewport: Viewport = { themeColor: "#FFF4EA" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

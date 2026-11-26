@@ -170,8 +170,17 @@ function Splash({ theme }: { theme: Theme }) {
 /* ------------------------------------------------------------------ top bar */
 function TopBar({ seen, current, theme }: { seen: Set<string>; current: string; theme: Theme }) {
   const n = seen.size, all = n === SECTIONS.length;
+  const [menu, setMenu] = useState(false);
+  const bar = useRef<HTMLElement>(null);
+  useEffect(() => {   // the phone menu closes on Esc or a tap outside it
+    if (!menu) return;
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setMenu(false); };
+    const tap = (e: PointerEvent) => { if (!bar.current?.contains(e.target as Node)) setMenu(false); };
+    addEventListener("keydown", key); addEventListener("pointerdown", tap);
+    return () => { removeEventListener("keydown", key); removeEventListener("pointerdown", tap); };
+  }, [menu]);
   return (
-    <header className="pf-bar">
+    <header className="pf-bar" ref={bar}>
       <div className="pf-wrap pf-bar-in">
         <a className="pf-brand" href="#top" aria-label={`${PROFILE.name}, back to top`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -193,7 +202,17 @@ function TopBar({ seen, current, theme }: { seen: Set<string>; current: string; 
           title={theme === "sunset" ? "Switch to the holo pastel colours" : "Switch to the sunset colours"}
           aria-label={`Colour theme: ${theme}. Switch theme`}><i /></button>
         <a className="pf-btn pf-btn-ink small" href={PROFILE.resume} download>CV ↓</a>
+        <button type="button" className="pf-menu-btn" aria-expanded={menu} aria-controls="pf-menu" onClick={() => setMenu((m) => !m)}>
+          <span aria-hidden="true" className={menu ? "x" : ""}><i /><i /><i /></span><span className="pf-sr">Sections menu</span>
+        </button>
       </div>
+      <nav id="pf-menu" className={"pf-menu" + (menu ? " open" : "")} aria-label="Sections" hidden={!menu}>
+        {SECTIONS.slice(1).map(([id, label], i) => (
+          <a key={id} href={`#${id}`} onClick={() => setMenu(false)} aria-current={current === id ? "true" : undefined}>
+            <span className="pf-num">{String(i + 1).padStart(2, "0")}</span>{label}{seen.has(id) && <em aria-label="seen">✓</em>}
+          </a>
+        ))}
+      </nav>
     </header>
   );
 }
@@ -483,13 +502,14 @@ function Play({ onPlay }: { onPlay: (g: Game) => void }) {
   return (
     <section id="play" className="pf-sec pf-play">
       <div className="pf-wrap">
-        <SecHead n="04" title="After hours: games you can play" sub="I make browser games and 3D sites in my own time, as Z Lab. Pick one; it opens right here." light />
+        <SecHead n="04" title="After hours: games and 3D sites" sub="I make browser games and 3D sites in my own time, as Z Lab. Pick one; it opens right here." light />
         <div className="pf-games">
-          {GAMES.map((g) => (
-            <button key={g.slug} type="button" className="pf-game" onClick={() => onPlay(g)}>
+          {GAMES.map((g, i) => (
+            <button key={g.slug} type="button" className={"pf-game" + (i === 0 ? " feat" : "")} onClick={() => onPlay(g)}>
               <img src={"/" + g.thumb} alt="" loading="lazy" />
               <span><b>{g.title}</b><small>{g.line}</small><em>{g.tech}</em></span>
               <span className="pf-play-btn" aria-hidden="true">▶ Play</span>
+              {i === 0 && <span className="pf-new" aria-hidden="true">New</span>}
             </button>
           ))}
         </div>

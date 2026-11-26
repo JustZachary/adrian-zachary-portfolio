@@ -147,10 +147,11 @@ export const PROJECTS: Project[] = [
   },
 ];
 
-/* Z Lab: the games and experiments, each playable at its own URL. */
+/* Z Lab: the games and 3D sites, each playable at its own URL (z-lab-kappa.vercel.app/<slug>/). */
 export const ZLAB_URL = "https://z-lab-kappa.vercel.app/";
 export type Game = { slug: string; title: string; line: string; thumb: string; tech: string };
 export const GAMES: Game[] = [
+  { slug: "tamber", title: "Tamber 75", line: "A keyboard launch site: scroll and it builds itself, then type on it with real-sounding switches.", thumb: "tamber.webp", tech: "Blender · Web Audio" },
   { slug: "wick", title: "Wick", line: "A tiny candle crosses a long night. Bridges only exist where its light reaches.", thumb: "wick.webp", tech: "Canvas · pixel art" },
   { slug: "mossbrook", title: "Mossbrook", line: "A cozy pixel village: farm, fish, sell at the stall, pet the dog.", thumb: "mossbrook.webp", tech: "Canvas · pixel art" },
   { slug: "laju", title: "Laju", line: "Crash racing through a city at golden hour. Takedowns, boost, aftertouch.", thumb: "laju.webp", tech: "three.js · Blender" },
