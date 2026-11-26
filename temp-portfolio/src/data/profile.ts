@@ -93,10 +93,10 @@ export const AWARDS = [
 ];
 
 export const SKILLS: { group: string; items: string[] }[] = [
-  { group: "Languages", items: ["TypeScript", "JavaScript", "PHP", "SQL", "Java", "Dart", "C++"] },
-  { group: "Web", items: ["React", "Next.js", "Tailwind CSS", "HTML & CSS", "three.js"] },
-  { group: "Backend & data", items: ["Node.js", "REST APIs", "MySQL", "SQLite", "Firebase"] },
-  { group: "Mobile", items: ["Flutter", "Android Studio"] },
+  { group: "Languages", items: ["TypeScript", "JavaScript", "Python", "PHP", "SQL", "Java", "Dart", "C++", "Bash"] },
+  { group: "Web & mobile", items: ["React", "Next.js", "Tailwind CSS", "HTML & CSS", "three.js", "Canvas & Web Audio", "Flutter", "Android Studio"] },
+  { group: "Backend & data", items: ["Node.js", "Laravel", "REST APIs", "Webhooks", "MySQL", "SQLite", "Firebase"] },
+  { group: "AI & automation", items: ["LLM APIs", "Retrieval (RAG)", "Playwright", "Cron jobs", "Telegram bots"] },
   { group: "Ops & cloud", items: ["Linux", "Nginx", "Git & GitHub", "Vercel", "AWS (studying SAA)"] },
   { group: "Design & 3D", items: ["Figma", "Blender", "Canva", "DaVinci Resolve"] },
 ];
