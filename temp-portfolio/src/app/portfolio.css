@@ -211,6 +211,33 @@
 @keyframes pf-fall { to { transform: translate(var(--dx), 110vh) rotate(540deg); } }
 .pf-confetti p { position: absolute; left: 50%; top: 84px; transform: translateX(-50%); margin: 0; background: var(--sun); border: 2.5px solid var(--ink); box-shadow: var(--shadow); padding: 10px 16px; font: 600 16px var(--pixel); white-space: nowrap; animation: pf-pop .25s ease-out; }
 
+/* splash: the logo builds, the name types in, then the screen breaks into pixels.
+   Timeline (seconds): logo 0–1.35, name 0.95–1.55, role 1.5, pixels go 2.0–2.55, gone 2.6.
+   .out (added on click / key / scroll) runs a quicker exit straight away. */
+.pf-splash { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; cursor: pointer;
+  animation: pf-splash-hide 0s linear 2.6s forwards; }
+[data-splash="skip"] .pf-splash { display: none; }
+@keyframes pf-splash-hide { to { visibility: hidden; pointer-events: none; } }
+.pf-splash-px { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(8, 1fr); }
+.pf-splash-px i { background: var(--bg); margin: -1px; animation: pf-cell-out .38s cubic-bezier(.5, 0, .9, .4) calc(2s + var(--d) * .5s) forwards; }
+@keyframes pf-cell-out { to { transform: scale(0) rotate(45deg); opacity: 0; } }
+.pf-splash-in { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; animation: pf-splash-fade .3s ease-in 1.9s forwards; }
+@keyframes pf-splash-fade { to { opacity: 0; transform: scale(.94); } }
+.pf-splash-in img { width: min(260px, 56vw); height: auto; }
+.pf-splash-name { margin: 6px 0 0; font: 600 clamp(26px, 5vw, 40px)/1.1 var(--pixel); color: var(--ink); white-space: nowrap;
+  clip-path: inset(0 100% 0 0); animation: pf-type .6s steps(14) .95s forwards; }
+@keyframes pf-type { to { clip-path: inset(0 0 0 0); } }
+.pf-splash-sub { margin: 0; font: 600 13px var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); opacity: 0; animation: pf-show .3s ease-out 1.5s forwards; }
+@keyframes pf-show { to { opacity: 1; } }
+.pf-splash-skip { position: absolute; bottom: max(20px, env(safe-area-inset-bottom, 0px)); left: 0; right: 0; margin: 0; text-align: center; font: 600 12px var(--pixel); color: var(--muted);
+  opacity: 0; animation: pf-show .3s 0.6s forwards, pf-splash-fade .2s ease-in 1.9s forwards; }
+.pf-splash.out { animation: pf-splash-hide2 0s linear .6s forwards; }
+@keyframes pf-splash-hide2 { to { visibility: hidden; pointer-events: none; } }
+.pf-splash.out .pf-splash-px i { animation: pf-cell-out2 .3s cubic-bezier(.5, 0, .9, .4) calc(var(--d) * .28s) forwards; }
+@keyframes pf-cell-out2 { to { transform: scale(0) rotate(45deg); opacity: 0; } }
+.pf-splash.out .pf-splash-in, .pf-splash.out .pf-splash-skip { animation: pf-splash-fade2 .15s ease-in forwards; }
+@keyframes pf-splash-fade2 { to { opacity: 0; transform: scale(.94); } }
+
 /* narrower screens */
 @media (max-width: 1020px) {
   .pf-nav { display: none; }

@@ -113,6 +113,56 @@ export default function Portfolio() {
       <CaseFile project={project} onClose={() => setProject(null)} />
       <GameWindow game={game} onClose={() => setGame(null)} />
       {party && <Confetti />}
+      <Splash theme={theme} />
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------- the splash
+   The 3D logo builds itself (a Blender render, played as an animated WebP), the
+   name types in, then the screen breaks into pixels and the page shows. About two
+   seconds; any click, key, scroll or tap skips it. It plays once per visit: a tiny
+   script in layout.tsx hides it before the first paint for repeat views and for
+   people who ask for reduced motion. Without JavaScript, CSS still removes it. */
+const SPLASH_COLS = 12, SPLASH_ROWS = 8;
+function Splash({ theme }: { theme: Theme }) {
+  const [gone, setGone] = useState(false);
+  const el = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    try { sessionStorage.setItem("pf-splash", "1"); } catch {}
+    const root = el.current;
+    if (!root) return;
+    if (getComputedStyle(root).display === "none") { const t = setTimeout(() => setGone(true), 0); return () => clearTimeout(t); }
+    const skip = () => root.classList.add("out");
+    const end = (e: AnimationEvent) => { if (e.target === root) setGone(true); };
+    root.addEventListener("animationend", end);
+    root.addEventListener("click", skip);
+    addEventListener("keydown", skip);
+    addEventListener("wheel", skip, { passive: true });
+    addEventListener("touchstart", skip, { passive: true });
+    return () => {
+      root.removeEventListener("animationend", end);
+      root.removeEventListener("click", skip);
+      removeEventListener("keydown", skip);
+      removeEventListener("wheel", skip);
+      removeEventListener("touchstart", skip);
+    };
+  }, []);
+  if (gone) return null;
+  return (
+    <div ref={el} className="pf-splash" aria-hidden="true">
+      <div className="pf-splash-px">
+        {Array.from({ length: SPLASH_COLS * SPLASH_ROWS }, (_, i) => (
+          <i key={i} style={{ ["--d" as string]: `${((i * 53) % 97) / 97}` }} />
+        ))}
+      </div>
+      <div className="pf-splash-in">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={`/splash-${theme}.webp`} width={260} height={260} alt="" />
+        <p className="pf-splash-name">{PROFILE.name}</p>
+        <p className="pf-splash-sub">{PROFILE.role}</p>
+      </div>
+      <p className="pf-splash-skip">click or press any key to skip</p>
     </div>
   );
 }

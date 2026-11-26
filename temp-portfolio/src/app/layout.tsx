@@ -18,8 +18,11 @@ export const viewport: Viewport = { themeColor: "#FFF8EC" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Before the first paint: skip the splash for repeat views this visit and for reduced motion. */}
+        <script dangerouslySetInnerHTML={{ __html: "try{if(matchMedia('(prefers-reduced-motion: reduce)').matches||sessionStorage.getItem('pf-splash'))document.documentElement.setAttribute('data-splash','skip')}catch(e){}" }} />
+        <link rel="preload" as="image" href="/splash-sunset.webp" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}

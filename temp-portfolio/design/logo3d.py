@@ -5,8 +5,11 @@
 # The site's two themes:
 #   sunset: TILE="#FF6B6B" GRAD="#FF6B6B,#FF9E6B,#FFC46B" LET="#1B1F4B" LET2="#FFFFFF" SHADOW="#1B1F4B"
 #   holo:   TILE="#FFFFFF" GRAD="#FFC6E8,#D9C6FF,#B8F0FF" LET="#1B1F4B" LET2="#7B3FE4" SHADOW="#FF4FA3"
-# then: python3 crop.py OUT.png logo-sunset.png .04 (same for holo), and
-#       python3 favset.py logo-sunset.png logo-holo.png <repo>/temp-portfolio   (needs pip install bpy pillow)
+# Logo: render at 1536 px, 96 samples, then python3 crop.py OUT.png logo-sunset.png .04 (same for holo)
+#       and python3 favset.py logo-sunset.png logo-holo.png <repo>/temp-portfolio
+# Splash: add FRAMES=32 and render at 480 px, 40 samples, to sp/sunset.png, then
+#       python3 splash_webp.py sp/sunset public/splash-sunset.webp   (same for holo)
+# Needs pip install bpy pillow.
 import sys, math, bpy
 from mathutils import Vector
 
@@ -109,6 +112,31 @@ sc.render.resolution_x = sc.render.resolution_y = size
 sc.render.film_transparent = bg == "none"
 sc.view_settings.view_transform = "Standard"; sc.view_settings.look = "None"
 sc.render.image_settings.file_format = "PNG"; sc.render.image_settings.color_mode = "RGBA"
-sc.render.filepath = out
-bpy.ops.render.render(write_still=True)
+FRAMES = int(os.environ.get("FRAMES", "0"))
+if not FRAMES:
+    sc.render.filepath = out
+    bpy.ops.render.render(write_still=True)
+else:
+    # Splash animation: the tile pops in, then the blocks snap into place left to right.
+    # Writes OUT_000.png ... ; the last frame is the finished logo.
+    def back(t, k=1.7):   # ease-out with a little overshoot
+        t = min(1, max(0, t)) - 1; return 1 + (k + 1) * t ** 3 + k * t ** 2
+    tile, shadow = bpy.data.objects["tile"], bpy.data.objects["shadow"]
+    blocks = sorted([o for o in bpy.data.objects if o.name.startswith("px")], key=lambda o: (round(o.location.x), -o.location.z))
+    home = {o.name: o.location.copy() for o in [tile, shadow] + blocks}
+    base = out[:-4] if out.endswith(".png") else out
+    for f in range(FRAMES):
+        for o, f0 in [(tile, 0), (shadow, 2)]:
+            t = back((f - f0) / 9)
+            o.scale = (max(.001, .25 + .75 * t),) * 3
+            o.rotation_euler = (0, math.radians(-22 * (1 - t)), 0)
+            o.location = home[o.name]
+        for i, o in enumerate(blocks):
+            s0 = 7 + i * .42; t = back((f - s0) / 7, 2.2)
+            o.scale = (max(.001, t),) * 3
+            h = home[o.name]
+            o.location = (h.x, h.y - 5 * (1 - t), h.z + 2.5 * (1 - t))
+        sc.render.filepath = f"{base}_{f:03d}.png"
+        bpy.ops.render.render(write_still=True)
+        print("FRAME", f, flush=True)
 print("RENDERED", out)
