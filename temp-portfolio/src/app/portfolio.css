@@ -323,9 +323,51 @@ html[data-pf-theme="night"] .pf-theme i { background: #12142B; box-shadow: inset
 .pf-case-nav { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; padding-top: 16px; border-top: 2px dashed var(--chip-line); }
 .pf-case-hint { font: 600 12px var(--pixel); color: var(--muted); }
 
+/* write-me-a-note form */
+.pf-note { border-top: 2.5px dashed var(--chip-line); padding: 22px 32px 30px; display: grid; gap: 14px; }
+.pf-note-h { margin: 0; font: 600 18px var(--pixel); }
+.pf-note-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.pf-note label { display: grid; gap: 6px; font: 600 13px var(--body); color: var(--muted); }
+.pf-note input, .pf-note select, .pf-note textarea { font: 500 15.5px var(--body); color: var(--ink); background: var(--cream); border: 2.5px solid var(--ink); border-radius: 10px; padding: 10px 12px; width: 100%; box-sizing: border-box; }
+.pf-note textarea { resize: vertical; min-height: 96px; }
+.pf-note input:focus, .pf-note select:focus, .pf-note textarea:focus { outline: 3px solid var(--sun); outline-offset: 1px; }
+.pf-note-go { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.pf-note-go small { color: var(--muted); font-size: 13px; max-width: 38em; }
+
+/* achievements: toasts bottom left, the shelf in the footer */
+.pf-toasts { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); z-index: 70; display: grid; gap: 10px; pointer-events: none; }
+.pf-toast { display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: min(340px, calc(100vw - 100px)); padding: 10px 14px 10px 10px; background: var(--card); color: var(--ink);
+  border: 2.5px solid var(--ink); border-radius: 12px; box-shadow: 4px 4px 0 var(--shade); animation: pf-toast 3.8s ease-in-out forwards; }
+.pf-toast-ico { display: grid; place-items: center; width: 42px; height: 42px; flex: none; font-size: 22px; background: var(--sun); border: 2px solid var(--ink); border-radius: 8px; color: #1B1F4B; }
+.pf-toast small { display: block; font: 600 10.5px var(--pixel); text-transform: uppercase; letter-spacing: .08em; color: var(--accent-text); }
+.pf-toast b { display: block; font: 600 16px var(--pixel); }
+.pf-toast em { display: block; font-style: normal; font-size: 13px; color: var(--muted); }
+@keyframes pf-toast { 0% { opacity: 0; transform: translateY(16px) scale(.96); } 8%, 86% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(8px); } }
+.pf-shelf { position: relative; }
+.pf-shelf-btn { font: 600 13px var(--pixel); color: var(--ink); background: var(--card); border: 2px solid var(--ink); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.pf-shelf-list { position: absolute; bottom: calc(100% + 10px); left: 50%; translate: -50% 0; z-index: 30; list-style: none; margin: 0; padding: 8px; width: min(320px, calc(100vw - 40px)); display: grid; gap: 2px;
+  background: var(--card); border: 2.5px solid var(--ink); border-radius: 12px; box-shadow: 4px 4px 0 var(--shade); }
+.pf-shelf-list li { display: grid; grid-template-columns: 30px 1fr; column-gap: 8px; align-items: center; padding: 6px; border-radius: 8px; opacity: .55; }
+.pf-shelf-list li.on { opacity: 1; }
+.pf-shelf-list li > span { grid-row: span 2; display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--ink); border-radius: 6px; background: var(--paper); font: 600 14px var(--pixel); }
+.pf-shelf-list li.on > span { background: var(--sun); color: #1B1F4B; }
+.pf-shelf-list b { font: 600 14px var(--pixel); }
+.pf-shelf-list em { font-style: normal; font-size: 12.5px; color: var(--muted); }
+
+/* 404 */
+.pf-404 { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background:
+  repeating-linear-gradient(0deg, color-mix(in srgb, var(--ink) 6%, transparent) 0 1px, transparent 1px 28px),
+  repeating-linear-gradient(90deg, color-mix(in srgb, var(--ink) 6%, transparent) 0 1px, transparent 1px 28px), var(--bg); }
+.pf-404-win { width: min(560px, 100%); }
+.pf-404-in { padding: 28px 30px 32px; display: grid; justify-items: start; gap: 10px; }
+.pf-404-code { margin: 6px 0 0; font: 600 64px/1 var(--pixel); color: var(--accent-text); }
+.pf-404 h1 { font-size: 30px; }
+.pf-404-in > p:not(.pf-404-code) { margin: 0; color: var(--text2); }
+.pf-404-go { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+
 /* footer */
 .pf-foot { border-top: 2.5px solid var(--ink); background: var(--paper); padding-block: 22px; font-size: 14px; color: var(--muted); }
-.pf-foot-in { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.pf-foot-in { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
 .pf-secret { font: 600 14px var(--pixel); color: var(--ink); }
 
 /* confetti */
@@ -455,7 +497,7 @@ html:not(.lenis) { scroll-behavior: smooth; }
 
 /* print: a clean, paper-friendly page with everything visible */
 @media print {
-  .pf-splash, .pf-bar, .pf-top, .pf-floaters, .pf-play, .pf-toy, .pf-filters, .pf-confetti, .pf-sticker, .pf-open, .pf-ctas, .pf-modal, .pf-secret, .pf-clock, .pf-contact-btns { display: none !important; }
+  .pf-splash, .pf-bar, .pf-top, .pf-floaters, .pf-play, .pf-toy, .pf-note, .pf-toasts, .pf-shelf, .pf-filters, .pf-confetti, .pf-sticker, .pf-open, .pf-ctas, .pf-modal, .pf-secret, .pf-clock, .pf-contact-btns { display: none !important; }
   .pf, .pf-alt, .pf-stats, .pf-foot { background: #fff !important; }
   .pf [data-reveal], .pf [data-hero] { opacity: 1 !important; translate: none !important; scale: none !important; }
   .pf-sec { padding-block: 24px; break-inside: auto; }
@@ -502,6 +544,9 @@ html:not(.lenis) { scroll-behavior: smooth; }
   .pf-case { padding: 18px; }
   .pf-shots.pf-phone { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pf-contact-in { padding: 22px; }
+  .pf-note { padding: 18px 22px 24px; }
+  .pf-note-row { grid-template-columns: 1fr; }
+  .pf-shelf-list { left: 0; translate: none; }
   .pf-confetti p { white-space: normal; width: max-content; max-width: calc(100vw - 40px); text-align: center; }
 }
 @media (prefers-reduced-motion: reduce) {

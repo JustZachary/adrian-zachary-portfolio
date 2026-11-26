@@ -36,6 +36,12 @@ from it: open `/cv` in Chrome, Print, Save as PDF (A4, no headers and footers), 
 replace that file. `CV` in `src/data/profile.ts` holds the summary and the phone
 number, which only the CV shows.
 
+## Achievements
+
+`src/components/Achievements.tsx` holds the trophy list. Anything can call
+`unlock("id")`; the toast, the footer shelf and the visitor's saved progress
+(their own browser only) follow from that.
+
 ## Adding a project
 
 Append an object to `PROJECTS` in `src/data/projects.ts` and stop; it

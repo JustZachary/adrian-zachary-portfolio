@@ -4,6 +4,7 @@
    three.js only loads when the section is close to the screen, rendering pauses while
    it is off screen, and without WebGL the rendered logo picture shows instead. */
 import { useEffect, useRef, useState } from "react";
+import { unlock } from "./Achievements";
 
 type Palette = { tile: string[]; a: string; z: string; shadow: string };
 const PALETTES: Record<string, Palette> = {
@@ -99,7 +100,7 @@ export default function LogoToy({ theme }: { theme: string }) {
           vel[i].set(h.x * .9 + (Math.random() - .5) * 10, h.y * .5 + 6 + Math.random() * 10, 14 + Math.random() * 16);
           spin[i].set((Math.random() - .5) * 14, (Math.random() - .5) * 14, (Math.random() - .5) * 14);
         });
-        setSmashes((s) => s + 1);
+        setSmashes((s) => { if (s + 1 >= 3) unlock("smasher"); return s + 1; });
       };
 
       // drag to spin; a click without a drag smashes

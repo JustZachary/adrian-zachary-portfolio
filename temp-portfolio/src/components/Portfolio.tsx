@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import Lenis from "lenis";
 import { PROFILE, QUICK_FACTS, EXPERIENCE, EDUCATION, AWARDS, SKILLS, STATS, ABOUT } from "../data/profile";
 import LogoToy from "./LogoToy";
+import { AchToasts, AchShelf, unlock, useKonami } from "./Achievements";
 import { PROJECTS, GAMES, ZLAB_URL } from "../data/projects";
 import type { Project, Game } from "../data/projects";
 import { PixelIcon } from "./icons";
@@ -44,6 +45,7 @@ const themeStore = {
   },
   set(t: Theme) {
     try { localStorage.setItem("pf-theme", t); } catch {}
+    unlock("decorator");
     document.documentElement.dataset.pfTheme = t;
     themeListeners.forEach((l) => l());
   },
@@ -173,12 +175,15 @@ function useScrollProgress() {
 
 export default function Portfolio() {
   const reduce = useReducedMotion();
-  const [party, setParty] = useState(false);
-  const { seen, current } = useVisited(() => {
-    if (reduce) return;
-    setParty(true);
-    setTimeout(() => setParty(false), 2600);
-  });
+  const [party, setParty] = useState<string | null>(null);   // confetti, with its message
+  const celebrate = (msg: string) => { if (reduce) return; setParty(msg); setTimeout(() => setParty(null), 2600); };
+  const { seen, current } = useVisited(() => { unlock("explorer"); celebrate("You read the whole thing. Thank you! ★"); });
+  useKonami(() => { unlock("konami"); celebrate("Cheat code accepted. +30 lives ★"); });
+  useEffect(() => {   // opening or downloading the CV, from anywhere
+    const click = (e: MouseEvent) => { if ((e.target as Element).closest?.('a[href$=".pdf"], a[href="/cv"]')) unlock("paper"); };
+    addEventListener("click", click, true);
+    return () => removeEventListener("click", click, true);
+  }, []);
   const theme = useTheme();
   // the page behind the page (overscroll, the strip under the phone toolbar) follows the theme
   useEffect(() => {   // the page behind the page and the phone's browser bar follow the theme
@@ -197,7 +202,7 @@ export default function Portfolio() {
       const typing = (e.target as HTMLElement)?.closest?.("input, textarea, [contenteditable]");
       if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || (e.key === "/" && !typing && !e.metaKey && !e.ctrlKey)) {
         if (document.querySelector("dialog[open]:not(.pf-pal-dlg)")) return;
-        e.preventDefault(); setPalette((o) => !o);
+        e.preventDefault(); setPalette((o) => !o); unlock("searcher");
       }
     };
     addEventListener("keydown", key);
@@ -220,7 +225,7 @@ export default function Portfolio() {
   return (
     <div className={`pf theme-${theme}`}>
       <a className="pf-skip" href="#work">Skip to my work</a>
-      <TopBar seen={seen} current={current} theme={theme} progress={progress} onSearch={() => setPalette(true)} />
+      <TopBar seen={seen} current={current} theme={theme} progress={progress} onSearch={() => { setPalette(true); unlock("searcher"); }} />
       <Hero reduce={reduce} live={live} />
       <Stats />
       <Work onOpen={setProject} />
@@ -232,6 +237,7 @@ export default function Portfolio() {
       <footer className="pf-foot">
         <div className="pf-wrap pf-foot-in">
           <span>© {new Date().getFullYear()} {PROFILE.name} · Built with Next.js, deployed on Vercel</span>
+          <AchShelf />
           <a href="/desktop" className="pf-secret">Psst: there is a retro desktop version of this site →</a>
         </div>
       </footer>
@@ -239,7 +245,8 @@ export default function Portfolio() {
         onNav={(d) => setProject((cur) => cur && PROJECTS[(PROJECTS.indexOf(cur) + d + PROJECTS.length) % PROJECTS.length])} />
       <GameWindow game={game} onClose={() => setGame(null)} />
       <Palette open={palette} onClose={() => setPalette(false)} commands={commands} />
-      {party && <Confetti />}
+      {party && <Confetti msg={party} />}
+      <AchToasts />
       <button type="button" className={"pf-top" + (progress > 0.12 ? " show" : "")} onClick={() => scrollToId("top")} aria-label="Back to top">
         <span aria-hidden="true">▲</span>
       </button>
@@ -663,7 +670,7 @@ function CaseFile({ project: p, onClose, onNav }: { project: Project | null; onC
   const box = useRef<HTMLDivElement>(null);
   const nav = useRef(onNav);
   useEffect(() => { nav.current = onNav; });
-  useEffect(() => { box.current?.scrollTo(0, 0); }, [p]);   // each project opens at its top
+  useEffect(() => { box.current?.scrollTo(0, 0); if (p) unlock("curious"); }, [p]);   // each project opens at its top
   const open = !!p;
   useEffect(() => {   // ← and → step through the projects
     if (!open) return;
@@ -878,6 +885,7 @@ function Play({ onPlay }: { onPlay: (g: Game) => void }) {
 
 function GameWindow({ game, onClose }: { game: Game | null; onClose: () => void }) {
   const url = game ? `${ZLAB_URL}${game.slug}/` : "";
+  useEffect(() => { if (game) unlock("gamer"); }, [game]);
   return (
     <Modal open={!!game} onClose={onClose} label={game ? `Play ${game.title}` : "Game"} wide>
       {game && (
@@ -954,9 +962,34 @@ function Contact() {
               <a className="pf-btn" href={PROFILE.github} target="_blank" rel="noopener">GitHub ↗</a>
             </div>
           </div>
+          <NoteForm />
         </div>
       </div>
     </section>
+  );
+}
+
+/* A short note that opens in the visitor's own email app, already addressed and filled
+   in. Nothing is sent from the page itself, so there is no server or inbox to set up. */
+const TOPICS = ["A job opening", "A freelance project", "One of the games", "Something else"];
+function NoteForm() {
+  const [name, setName] = useState(""), [topic, setTopic] = useState(TOPICS[0]), [msg, setMsg] = useState("");
+  const [opened, setOpened] = useState(false);
+  const href = "mailto:" + PROFILE.email + "?subject=" + encodeURIComponent(`${topic}${name ? " · from " + name : ""}`) +
+    "&body=" + encodeURIComponent(`Hi ${PROFILE.nickname},\n\n${msg}\n\n${name}`);
+  return (
+    <form className="pf-note" onSubmit={(e) => { e.preventDefault(); setOpened(true); window.location.href = href; }}>
+      <p className="pf-note-h">Or write me a note</p>
+      <div className="pf-note-row">
+        <label><span>Your name</span><input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Nur Aisyah" /></label>
+        <label><span>It&rsquo;s about</span><select value={topic} onChange={(e) => setTopic(e.target.value)}>{TOPICS.map((t) => <option key={t}>{t}</option>)}</select></label>
+      </div>
+      <label><span>Message</span><textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={4} required placeholder={`Hi ${PROFILE.nickname}, we're hiring for…`} /></label>
+      <div className="pf-note-go">
+        <button type="submit" className="pf-btn pf-btn-ink">Open in my email app →</button>
+        <small>{opened ? <>Your email app should have opened. If not, write to <b>{PROFILE.email}</b>.</> : "It opens your own email app with this filled in; nothing is sent from the page."}</small>
+      </div>
+    </form>
   );
 }
 
@@ -982,7 +1015,7 @@ function SecHead({ n, title, sub, light }: { n: string; title: string; sub?: str
 }
 
 /* Pixel confetti, once, when every section has been seen. */
-function Confetti() {
+function Confetti({ msg }: { msg: string }) {
   const colors = ["var(--tomato)", "var(--sun)", "var(--pop)", "var(--t1)", "var(--t2)"];
   return (
     <div className="pf-confetti" aria-hidden="true">
@@ -993,7 +1026,7 @@ function Confetti() {
           ["--dx" as string]: `${((i * 29) % 80) - 40}px`,
         }} />
       ))}
-      <p>You read the whole thing. Thank you! ★</p>
+      <p>{msg}</p>
     </div>
   );
 }
