@@ -9,7 +9,7 @@
  *
  * Words live in src/data/profile.ts and src/data/projects.ts, not here.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { PROFILE, QUICK_FACTS, EXPERIENCE, EDUCATION, AWARDS, SKILLS } from "../data/profile";
 import { PROJECTS, GAMES, ZLAB_URL } from "../data/projects";
 import type { Project, Game } from "../data/projects";
@@ -23,6 +23,22 @@ const SECTIONS = [
   ["play", "Play"],
   ["contact", "Contact"],
 ] as const;
+
+/* The colour theme, remembered per visitor. A tiny store so the server render and the
+   first client render agree, and every reader updates together when it changes. */
+type Theme = "sunset" | "holo";
+const themeListeners = new Set<() => void>();
+const themeStore = {
+  get(): Theme {
+    try { const t = localStorage.getItem("pf-theme"); if (t === "sunset" || t === "holo") return t; } catch {}
+    return PROFILE.theme;
+  },
+  set(t: Theme) { try { localStorage.setItem("pf-theme", t); } catch {} themeListeners.forEach((l) => l()); },
+  sub(l: () => void) { themeListeners.add(l); return () => { themeListeners.delete(l); }; },
+};
+function useTheme() {
+  return useSyncExternalStore(themeStore.sub, themeStore.get, () => PROFILE.theme);
+}
 
 function useReducedMotion() {
   const [reduce, setReduce] = useState(false);
@@ -73,12 +89,15 @@ export default function Portfolio() {
     setParty(true);
     setTimeout(() => setParty(false), 2600);
   });
+  const theme = useTheme();
+  // the page behind the page (overscroll, the strip under the phone toolbar) follows the theme
+  useEffect(() => { document.documentElement.style.background = theme === "holo" ? "#FBF9FF" : "#FFF4EA"; }, [theme]);
   const [project, setProject] = useState<Project | null>(null);
   const [game, setGame] = useState<Game | null>(null);
 
   return (
-    <div className="pf">
-      <TopBar seen={seen} current={current} />
+    <div className={`pf theme-${theme}`}>
+      <TopBar seen={seen} current={current} theme={theme} />
       <Hero reduce={reduce} />
       <Work onOpen={setProject} />
       <Experience />
@@ -99,13 +118,14 @@ export default function Portfolio() {
 }
 
 /* ------------------------------------------------------------------ top bar */
-function TopBar({ seen, current }: { seen: Set<string>; current: string }) {
+function TopBar({ seen, current, theme }: { seen: Set<string>; current: string; theme: Theme }) {
   const n = seen.size, all = n === SECTIONS.length;
   return (
     <header className="pf-bar">
       <div className="pf-wrap pf-bar-in">
         <a className="pf-brand" href="#top" aria-label={`${PROFILE.name}, back to top`}>
-          <span className="pf-mark" aria-hidden="true">AZ</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="pf-mark" src={`/logo-${theme}.png`} alt="" width={40} height={40} />
           <span className="pf-brand-name">{PROFILE.name}</span>
         </a>
         <nav className="pf-nav" aria-label="Sections">
@@ -119,6 +139,9 @@ function TopBar({ seen, current }: { seen: Set<string>; current: string }) {
           </span>
           <span className="pf-xp-label">{all ? "100%!" : `${Math.round((n / SECTIONS.length) * 100)}%`}</span>
         </div>
+        <button type="button" className="pf-theme" onClick={() => themeStore.set(theme === "sunset" ? "holo" : "sunset")}
+          title={theme === "sunset" ? "Switch to the holo pastel colours" : "Switch to the sunset colours"}
+          aria-label={`Colour theme: ${theme}. Switch theme`}><i /></button>
         <a className="pf-btn pf-btn-ink small" href={PROFILE.resume} download>CV ↓</a>
       </div>
     </header>
@@ -285,7 +308,7 @@ function Card({ p, onOpen }: { p: Project; onOpen: () => void }) {
   const flat = () => { el.current!.style.setProperty("--rx", "0deg"); el.current!.style.setProperty("--ry", "0deg"); };
   return (
     <button ref={el} type="button" className="pf-card" onClick={onOpen} onPointerMove={tilt} onPointerLeave={flat}>
-      <span className="pf-card-top" style={{ background: p.tile }}>
+      <span className="pf-card-top" style={{ background: `var(--t${PROJECTS.indexOf(p) % 4})` }}>
         {p.images?.length ? <img src={"/" + p.images[0]} alt="" className={p.imageShape === "phone" ? "pf-phone" : ""} /> : <PixelIcon name={p.icon} size={64} />}
         <span className="pf-kind">{p.kind}</span>
       </span>
@@ -320,7 +343,7 @@ function CaseFile({ project: p, onClose }: { project: Project | null; onClose: (
     <Modal open={!!p} onClose={onClose} label={p ? p.title : "Project"}>
       {p && (
         <div className="pf-win">
-          <div className="pf-win-bar" style={{ background: p.tile }}><i /><i /><i /><span>{p.slug}.txt</span>
+          <div className="pf-win-bar"><i /><i /><i /><span>{p.slug}.txt</span>
             <button type="button" className="pf-x" onClick={onClose} aria-label="Close">✕</button></div>
           <div className="pf-case">
             <p className="pf-kicker">{p.kind}</p>
@@ -479,7 +502,7 @@ function SecHead({ n, title, sub, light }: { n: string; title: string; sub?: str
 
 /* Pixel confetti, once, when every section has been seen. */
 function Confetti() {
-  const colors = ["#FF5A36", "#2D5BFF", "#FFC93C", "#3DD6A3", "#B8557A"];
+  const colors = ["var(--tomato)", "var(--sun)", "var(--pop)", "var(--t1)", "var(--t2)"];
   return (
     <div className="pf-confetti" aria-hidden="true">
       {Array.from({ length: 48 }, (_, i) => (

@@ -19,6 +19,9 @@ export const PROFILE = {
   linkedin: "https://www.linkedin.com/in/adrian-zachary-ian-2a4748181/",
   resume: "/adrian_zachary_resume.pdf",
   photo: "/my_picture.jpg",
+  /* The colour theme visitors see first: "sunset" or "holo". They can flip it with the
+     round button in the top bar. The favicon files in src/app/ are drawn for one theme. */
+  theme: "sunset" as "sunset" | "holo",
 };
 
 /* The 30-second version, top of the page. One line each. */
