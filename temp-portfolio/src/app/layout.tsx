@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import "lenis/dist/lenis.css";
 import "./globals.css";
 import "./portfolio.css";
 
@@ -23,8 +24,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Before the first paint: skip the splash for repeat views this visit and for reduced motion. */}
-        <script dangerouslySetInnerHTML={{ __html: "try{if(matchMedia('(prefers-reduced-motion: reduce)').matches||sessionStorage.getItem('pf-splash'))document.documentElement.setAttribute('data-splash','skip')}catch(e){}" }} />
+        {/* Before the first paint: skip the splash for repeat views this visit and for reduced motion,
+            and switch on the scroll-in animations (pf-anim) unless motion is reduced. */}
+        <script dangerouslySetInnerHTML={{ __html: "try{var d=document.documentElement,r=matchMedia('(prefers-reduced-motion: reduce)').matches;if(!r)d.classList.add('pf-anim');if(r||sessionStorage.getItem('pf-splash'))d.setAttribute('data-splash','skip')}catch(e){}" }} />
         <link rel="preload" as="image" href="/splash-sunset.webp" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />

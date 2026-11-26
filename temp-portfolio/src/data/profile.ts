@@ -33,6 +33,14 @@ export const QUICK_FACTS: { label: string; value: string }[] = [
   { label: "Studying", value: "AWS Solutions Architect – Associate" },
 ];
 
+/* The four numbers under the hero; they count up when they scroll into view. */
+export const STATS: { value: number; suffix?: string; label: string }[] = [
+  { value: 4, label: "internal tools built at work" },
+  { value: 34, label: "browser games and 3D sites on Z Lab" },
+  { value: 2, suffix: "×", label: "Dean's List at UKM" },
+  { value: 5, label: "months on government systems at SAINS" },
+];
+
 export type Job = { role: string; org: string; place: string; when: string; points: string[]; tech?: string[] };
 
 export const EXPERIENCE: Job[] = [

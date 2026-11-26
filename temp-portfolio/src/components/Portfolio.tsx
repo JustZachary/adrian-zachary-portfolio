@@ -10,7 +10,8 @@
  * Words live in src/data/profile.ts and src/data/projects.ts, not here.
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { PROFILE, QUICK_FACTS, EXPERIENCE, EDUCATION, AWARDS, SKILLS } from "../data/profile";
+import Lenis from "lenis";
+import { PROFILE, QUICK_FACTS, EXPERIENCE, EDUCATION, AWARDS, SKILLS, STATS } from "../data/profile";
 import { PROJECTS, GAMES, ZLAB_URL } from "../data/projects";
 import type { Project, Game } from "../data/projects";
 import { PixelIcon } from "./icons";
@@ -81,6 +82,77 @@ function useVisited(onAll: () => void) {
   return { seen, current };
 }
 
+/* Smooth scrolling for the whole page (Lenis): the wheel glides instead of stepping,
+   and every #section link scrolls there instead of jumping, stopping just under the
+   top bar. Off for reduced motion, where links jump as normal. */
+let lenis: Lenis | null = null;
+const BAR = 70;
+function useSmoothScroll(reduce: boolean) {
+  useEffect(() => {
+    if (reduce) return;
+    const l = new Lenis({ autoRaf: true, lerp: 0.1, allowNestedScroll: true });
+    lenis = l;
+    // any in-page link (#work, #contact...) glides instead of jumping
+    const click = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as Element).closest?.('a[href^="#"]') as HTMLAnchorElement | null;
+      const id = a?.getAttribute("href")?.slice(1);
+      if (!id || !document.getElementById(id)) return;
+      e.preventDefault();
+      scrollToId(id);
+      history.replaceState(null, "", "#" + id);
+    };
+    document.addEventListener("click", click, true);
+    return () => { document.removeEventListener("click", click, true); l.destroy(); lenis = null; };
+  }, [reduce]);
+}
+function scrollToId(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const y = id === "top" ? 0 : el.getBoundingClientRect().top + scrollY - BAR;
+  if (lenis) lenis.scrollTo(y, { duration: 1.15, easing: (t) => 1 - Math.pow(1 - t, 4) });
+  else scrollTo(0, y);
+}
+
+/* Things fade and rise into place as they scroll into view. Anything marked
+   data-reveal takes part; --i on it staggers a group. The page shows everything
+   if this never runs (see the failsafe in portfolio.css). */
+function useReveal() {
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("pf-js");
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
+    const watch = () => document.querySelectorAll("[data-reveal]:not(.in)").forEach((el) => io.observe(el));
+    watch();
+    const mo = new MutationObserver(watch);   // cards added later (filters) join in too
+    mo.observe(document.querySelector(".pf") ?? document.body, { childList: true, subtree: true });
+    return () => { io.disconnect(); mo.disconnect(); };
+  }, []);
+}
+
+/* A thin bar under the header that fills as you read, and the back-to-top button. */
+function useScrollProgress() {
+  const [p, setP] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const on = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const max = document.documentElement.scrollHeight - innerHeight;
+        setP(max > 0 ? Math.min(1, scrollY / max) : 0);
+      });
+    };
+    on();
+    addEventListener("scroll", on, { passive: true });
+    addEventListener("resize", on);
+    return () => { removeEventListener("scroll", on); removeEventListener("resize", on); cancelAnimationFrame(raf); };
+  }, []);
+  return p;
+}
+
 export default function Portfolio() {
   const reduce = useReducedMotion();
   const [party, setParty] = useState(false);
@@ -94,11 +166,16 @@ export default function Portfolio() {
   useEffect(() => { document.documentElement.style.background = theme === "holo" ? "#FBF9FF" : "#FFF4EA"; }, [theme]);
   const [project, setProject] = useState<Project | null>(null);
   const [game, setGame] = useState<Game | null>(null);
+  const [live, setLive] = useState(false);   // the splash has gone: start the hero's entrance
+  useSmoothScroll(reduce);
+  useReveal();
+  const progress = useScrollProgress();
 
   return (
     <div className={`pf theme-${theme}`}>
-      <TopBar seen={seen} current={current} theme={theme} />
-      <Hero reduce={reduce} />
+      <TopBar seen={seen} current={current} theme={theme} progress={progress} />
+      <Hero reduce={reduce} live={live} />
+      <Stats />
       <Work onOpen={setProject} />
       <Experience />
       <Skills />
@@ -113,7 +190,10 @@ export default function Portfolio() {
       <CaseFile project={project} onClose={() => setProject(null)} />
       <GameWindow game={game} onClose={() => setGame(null)} />
       {party && <Confetti />}
-      <Splash theme={theme} />
+      <button type="button" className={"pf-top" + (progress > 0.12 ? " show" : "")} onClick={() => scrollToId("top")} aria-label="Back to top">
+        <span aria-hidden="true">▲</span>
+      </button>
+      <Splash theme={theme} onDone={() => setLive(true)} />
     </div>
   );
 }
@@ -125,15 +205,18 @@ export default function Portfolio() {
    script in layout.tsx hides it before the first paint for repeat views and for
    people who ask for reduced motion. Without JavaScript, CSS still removes it. */
 const SPLASH_COLS = 12, SPLASH_ROWS = 8;
-function Splash({ theme }: { theme: Theme }) {
+function Splash({ theme, onDone }: { theme: Theme; onDone: () => void }) {
   const [gone, setGone] = useState(false);
   const el = useRef<HTMLDivElement>(null);
+  const done = useRef(onDone);
+  useEffect(() => { done.current = onDone; });
   useEffect(() => {
     try { sessionStorage.setItem("pf-splash", "1"); } catch {}
     const root = el.current;
     if (!root) return;
-    if (getComputedStyle(root).display === "none") { const t = setTimeout(() => setGone(true), 0); return () => clearTimeout(t); }
-    const skip = () => root.classList.add("out");
+    if (getComputedStyle(root).display === "none") { const t = setTimeout(() => { setGone(true); done.current(); }, 0); return () => clearTimeout(t); }
+    const leaving = setTimeout(() => done.current(), 1900);   // the hero comes in as the pixels go
+    const skip = () => { root.classList.add("out"); clearTimeout(leaving); done.current(); };
     const end = (e: AnimationEvent) => { if (e.target === root) setGone(true); };
     root.addEventListener("animationend", end);
     root.addEventListener("click", skip);
@@ -141,6 +224,7 @@ function Splash({ theme }: { theme: Theme }) {
     addEventListener("wheel", skip, { passive: true });
     addEventListener("touchstart", skip, { passive: true });
     return () => {
+      clearTimeout(leaving);
       root.removeEventListener("animationend", end);
       root.removeEventListener("click", skip);
       removeEventListener("keydown", skip);
@@ -168,7 +252,7 @@ function Splash({ theme }: { theme: Theme }) {
 }
 
 /* ------------------------------------------------------------------ top bar */
-function TopBar({ seen, current, theme }: { seen: Set<string>; current: string; theme: Theme }) {
+function TopBar({ seen, current, theme, progress }: { seen: Set<string>; current: string; theme: Theme; progress: number }) {
   const n = seen.size, all = n === SECTIONS.length;
   const [menu, setMenu] = useState(false);
   const bar = useRef<HTMLElement>(null);
@@ -206,6 +290,7 @@ function TopBar({ seen, current, theme }: { seen: Set<string>; current: string; 
           <span aria-hidden="true" className={menu ? "x" : ""}><i /><i /><i /></span><span className="pf-sr">Sections menu</span>
         </button>
       </div>
+      <i className="pf-progress" style={{ transform: `scaleX(${progress})` }} aria-hidden="true" />
       <nav id="pf-menu" className={"pf-menu" + (menu ? " open" : "")} aria-label="Sections" hidden={!menu}>
         {SECTIONS.slice(1).map(([id, label], i) => (
           <a key={id} href={`#${id}`} onClick={() => setMenu(false)} aria-current={current === id ? "true" : undefined}>
@@ -218,11 +303,29 @@ function TopBar({ seen, current, theme }: { seen: Set<string>; current: string; 
 }
 
 /* --------------------------------------------------------------------- hero */
-function Hero({ reduce }: { reduce: boolean }) {
+function Hero({ reduce, live }: { reduce: boolean; live: boolean }) {
+  const floaters = useRef<HTMLDivElement>(null);
+  useEffect(() => {   // a few pixel shapes drift with the mouse and the scroll
+    if (reduce) return;
+    const el = floaters.current;
+    if (!el) return;
+    let mx = 0, my = 0, raf = 0;
+    const set = () => { raf = 0; el.style.setProperty("--mx", mx.toFixed(3)); el.style.setProperty("--my", my.toFixed(3)); el.style.setProperty("--sy", String(Math.min(scrollY, 900))); };
+    const move = (e: PointerEvent) => { mx = e.clientX / innerWidth - 0.5; my = e.clientY / innerHeight - 0.5; if (!raf) raf = requestAnimationFrame(set); };
+    const scroll = () => { if (!raf) raf = requestAnimationFrame(set); };
+    addEventListener("pointermove", move, { passive: true });
+    addEventListener("scroll", scroll, { passive: true });
+    return () => { removeEventListener("pointermove", move); removeEventListener("scroll", scroll); cancelAnimationFrame(raf); };
+  }, [reduce]);
   return (
-    <section id="top" className="pf-hero">
+    <section id="top" className={"pf-hero" + (live ? " live" : "")}>
+      <div className="pf-floaters" ref={floaters} aria-hidden="true">
+        {[["sq", 8, 18, .9], ["plus", 46, 10, .5], ["sq", 90, 26, 1.3], ["dot", 70, 78, .7], ["plus", 14, 82, 1.1], ["sq", 56, 64, .4], ["dot", 34, 40, 1.6]].map(([k, x, y, d], i) => (
+          <i key={i} className={"f-" + k} style={{ left: x + "%", top: y + "%", ["--d" as string]: d }} />
+        ))}
+      </div>
       <div className="pf-wrap pf-hero-in">
-        <div className="pf-hero-copy">
+        <div className="pf-hero-copy" data-hero>
           <p className="pf-kicker">{PROFILE.role} · {PROFILE.location}</p>
           <h1>Hi, I&rsquo;m {PROFILE.name.split(" ")[0]}.<span className="pf-cursor" aria-hidden="true" /></h1>
           <p className="pf-lede">{PROFILE.intro}</p>
@@ -237,15 +340,15 @@ function Hero({ reduce }: { reduce: boolean }) {
             <a href={PROFILE.github} target="_blank" rel="noopener">GitHub ↗</a>
           </p>
         </div>
-        <div className="pf-hero-side">
-          <PixelPortrait reduce={reduce} />
+        <div className="pf-hero-side" data-hero>
+          <PixelPortrait reduce={reduce} live={live} />
           <div className="pf-win pf-facts">
             <div className="pf-win-bar"><i /><i /><i /><span>quick-facts.txt</span></div>
             <dl className="pf-facts-list">
               {QUICK_FACTS.map((f, i) => (
                 <div key={f.label}>
                   <dt>{f.label}</dt>
-                  <dd><TypeIn text={f.value} delay={reduce ? 0 : 500 + i * 380} reduce={reduce} /></dd>
+                  <dd><TypeIn text={f.value} delay={500 + i * 380} reduce={reduce} live={live} /></dd>
                 </div>
               ))}
             </dl>
@@ -257,16 +360,16 @@ function Hero({ reduce }: { reduce: boolean }) {
 }
 
 /* A line that types itself in. The whole text is always there for screen readers. */
-function TypeIn({ text, delay, reduce }: { text: string; delay: number; reduce: boolean }) {
+function TypeIn({ text, delay, reduce, live }: { text: string; delay: number; reduce: boolean; live: boolean }) {
   const [typed, setN] = useState(0);
   const n = reduce ? text.length : typed;
   useEffect(() => {
-    if (reduce) return;
+    if (reduce || !live) return;
     let i = 0, t: ReturnType<typeof setTimeout>;
     const step = () => { i += 2; setN(Math.min(i, text.length)); if (i < text.length) t = setTimeout(step, 14); };
     t = setTimeout(step, delay);
     return () => clearTimeout(t);
-  }, [text, delay, reduce]);
+  }, [text, delay, reduce, live]);
   return (
     <>
       <span className="pf-sr">{text}</span>
@@ -276,10 +379,10 @@ function TypeIn({ text, delay, reduce }: { text: string; delay: number; reduce: 
 }
 
 /* The photo starts as chunky pixels and sharpens; hovering it pixelates it again. */
-function PixelPortrait({ reduce }: { reduce: boolean }) {
+function PixelPortrait({ reduce, live }: { reduce: boolean; live: boolean }) {
   const cv = useRef<HTMLCanvasElement>(null);
   const img = useRef<HTMLImageElement | null>(null);
-  const block = useRef(28), target = useRef(1), raf = useRef(0);
+  const block = useRef(28), target = useRef(28), raf = useRef(0);
 
   const paint = useCallback(() => {
     const c = cv.current, im = img.current;
@@ -314,12 +417,16 @@ function PixelPortrait({ reduce }: { reduce: boolean }) {
     im.src = PROFILE.photo;
     im.onload = () => {
       img.current = im;
-      if (reduce) { block.current = 1; paint(); return; }
+      if (reduce) block.current = 1;
       paint();
-      setTimeout(() => { target.current = 1; animate(); }, 650);
     };
     return () => cancelAnimationFrame(raf.current);
-  }, [reduce, paint, animate]);
+  }, [reduce, paint]);
+  useEffect(() => {   // sharpen once the splash has gone
+    if (reduce || !live) return;
+    const t = setTimeout(() => { target.current = 1; animate(); }, 450);
+    return () => clearTimeout(t);
+  }, [live, reduce, animate]);
 
   const to = (b: number) => { if (reduce) return; target.current = b; animate(); };
   return (
@@ -342,6 +449,46 @@ function CopyEmail({ className }: { className?: string }) {
   );
 }
 
+/* -------------------------------------------------------------------- stats
+   Four numbers that count up the first time they come into view. */
+function Stats() {
+  return (
+    <section className="pf-stats" aria-label="At a glance">
+      <div className="pf-wrap pf-stats-in">
+        {STATS.map((st, i) => (
+          <div key={st.label} className="pf-stat" data-reveal style={{ ["--i" as string]: i }}>
+            <b><CountUp to={st.value} />{st.suffix}</b>
+            <span className="pf-stat-label">{st.label}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+function CountUp({ to }: { to: number }) {
+  const el = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const node = el.current;
+    if (!node || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    const io = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return;
+      io.disconnect();
+      const t0 = performance.now(), dur = 1100;
+      const tick = (t: number) => {
+        const k = Math.min(1, (t - t0) / dur), ease = 1 - Math.pow(1 - k, 3);
+        node.textContent = String(Math.round(to * ease));
+        if (k < 1) raf = requestAnimationFrame(tick);
+      };
+      node.textContent = "0";
+      raf = requestAnimationFrame(tick);
+    }, { threshold: 0.6 });
+    io.observe(node);
+    return () => { io.disconnect(); cancelAnimationFrame(raf); };
+  }, [to]);
+  return <span ref={el}>{to}</span>;
+}
+
 /* --------------------------------------------------------------------- work */
 const FILTERS = [["all", "All"], ["work", "Built at work"], ["study", "Study & internship"]] as const;
 
@@ -352,7 +499,7 @@ function Work({ onOpen }: { onOpen: (p: Project) => void }) {
     <section id="work" className="pf-sec">
       <div className="pf-wrap">
         <SecHead n="01" title="Things I've built" sub="Click a card for the problem, what I did and how it turned out." />
-        <div className="pf-filters" role="group" aria-label="Filter projects">
+        <div className="pf-filters" role="group" aria-label="Filter projects" data-reveal>
           {FILTERS.map(([id, label]) => (
             <button key={id} type="button" aria-pressed={f === id} onClick={() => setF(id)}>
               {label} <small>{id === "all" ? PROJECTS.length : PROJECTS.filter((p) => p.area === id).length}</small>
@@ -360,14 +507,14 @@ function Work({ onOpen }: { onOpen: (p: Project) => void }) {
           ))}
         </div>
         <div className="pf-cards">
-          {list.map((p) => <Card key={p.slug} p={p} onOpen={() => onOpen(p)} />)}
+          {list.map((p, i) => <Card key={p.slug} p={p} i={i} onOpen={() => onOpen(p)} />)}
         </div>
       </div>
     </section>
   );
 }
 
-function Card({ p, onOpen }: { p: Project; onOpen: () => void }) {
+function Card({ p, i, onOpen }: { p: Project; i: number; onOpen: () => void }) {
   const el = useRef<HTMLButtonElement>(null);
   const tilt = (e: React.PointerEvent) => {
     const r = el.current!.getBoundingClientRect();
@@ -376,7 +523,7 @@ function Card({ p, onOpen }: { p: Project; onOpen: () => void }) {
   };
   const flat = () => { el.current!.style.setProperty("--rx", "0deg"); el.current!.style.setProperty("--ry", "0deg"); };
   return (
-    <button ref={el} type="button" className="pf-card" onClick={onOpen} onPointerMove={tilt} onPointerLeave={flat}>
+    <button ref={el} type="button" className="pf-card" data-reveal style={{ ["--i" as string]: i % 3 }} onClick={onOpen} onPointerMove={tilt} onPointerLeave={flat}>
       <span className="pf-card-top" style={{ background: `var(--t${PROJECTS.indexOf(p) % 4})` }}>
         {p.images?.length ? <img src={"/" + p.images[0]} alt="" className={p.imageShape === "phone" ? "pf-phone" : ""} /> : <PixelIcon name={p.icon} size={64} />}
         <span className="pf-kind">{p.kind}</span>
@@ -396,11 +543,12 @@ function Modal({ open, onClose, label, wide, children }: { open: boolean; onClos
   const d = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const el = d.current!;
-    if (open && !el.open) el.showModal();
+    if (open && !el.open) { el.showModal(); lenis?.stop(); }
     if (!open && el.open) el.close();
+    if (!open) lenis?.start();
   }, [open]);
   return (
-    <dialog ref={d} className={"pf-modal" + (wide ? " wide" : "")} aria-label={label} onClose={onClose}
+    <dialog ref={d} data-lenis-prevent className={"pf-modal" + (wide ? " wide" : "")} aria-label={label} onClose={onClose}
       onClick={(e) => { if (e.target === d.current) onClose(); }}>
       {open && children}
     </dialog>
@@ -449,9 +597,9 @@ function Experience() {
       <div className="pf-wrap">
         <SecHead n="02" title="Experience & education" />
         <div className="pf-two">
-          <ol className="pf-timeline">
+          <ol className="pf-timeline" data-reveal>
             {EXPERIENCE.map((j) => (
-              <li key={j.org + j.role}>
+              <li key={j.org + j.role} data-reveal>
                 <p className="pf-when">{j.when} · {j.place}</p>
                 <h3>{j.role}</h3>
                 <p className="pf-org">{j.org}</p>
@@ -462,12 +610,12 @@ function Experience() {
           </ol>
           <div className="pf-edu">
             {EDUCATION.map((e) => (
-              <div key={e.school} className="pf-win pf-edu-card">
+              <div key={e.school} className="pf-win pf-edu-card" data-reveal>
                 <div className="pf-win-bar"><i /><i /><i /><span>{e.when}</span></div>
                 <div className="pf-edu-body"><b>{e.school}</b><span>{e.what}</span><small>{e.detail}</small></div>
               </div>
             ))}
-            <div className="pf-win pf-edu-card">
+            <div className="pf-win pf-edu-card" data-reveal>
               <div className="pf-win-bar sun"><i /><i /><i /><span>achievements.txt</span></div>
               <ul className="pf-awards">{AWARDS.map((a) => <li key={a}>{a}</li>)}</ul>
             </div>
@@ -485,8 +633,8 @@ function Skills() {
       <div className="pf-wrap">
         <SecHead n="03" title="Skills" sub="What I use, grouped the way a job ad lists them." />
         <div className="pf-skills">
-          {SKILLS.map((g) => (
-            <div key={g.group} className="pf-skill">
+          {SKILLS.map((g, i) => (
+            <div key={g.group} className="pf-skill" data-reveal style={{ ["--i" as string]: i % 3 }}>
               <b>{g.group}</b>
               <div className="pf-slots">{g.items.map((s) => <span key={s}>{s}</span>)}</div>
             </div>
@@ -505,7 +653,7 @@ function Play({ onPlay }: { onPlay: (g: Game) => void }) {
         <SecHead n="04" title="After hours: games and 3D sites" sub="I make browser games and 3D sites in my own time, as Z Lab. Pick one; it opens right here." light />
         <div className="pf-games">
           {GAMES.map((g, i) => (
-            <button key={g.slug} type="button" className={"pf-game" + (i === 0 ? " feat" : "")} onClick={() => onPlay(g)}>
+            <button key={g.slug} type="button" className={"pf-game" + (i === 0 ? " feat" : "")} data-reveal style={{ ["--i" as string]: i % 4 }} onClick={() => onPlay(g)}>
               <img src={"/" + g.thumb} alt="" loading="lazy" />
               <span><b>{g.title}</b><small>{g.line}</small><em>{g.tech}</em></span>
               <span className="pf-play-btn" aria-hidden="true">▶ Play</span>
@@ -540,7 +688,7 @@ function Contact() {
   return (
     <section id="contact" className="pf-sec">
       <div className="pf-wrap">
-        <div className="pf-win pf-contact">
+        <div className="pf-win pf-contact" data-reveal>
           <div className="pf-win-bar tomato"><i /><i /><i /><span>say-hi.txt</span></div>
           <div className="pf-contact-in">
             <div>
@@ -563,7 +711,7 @@ function Contact() {
 
 function SecHead({ n, title, sub, light }: { n: string; title: string; sub?: string; light?: boolean }) {
   return (
-    <div className={"pf-head" + (light ? " light" : "")}>
+    <div className={"pf-head" + (light ? " light" : "")} data-reveal>
       <span className="pf-num">{n}</span>
       <div><h2>{title}</h2>{sub && <p>{sub}</p>}</div>
     </div>
