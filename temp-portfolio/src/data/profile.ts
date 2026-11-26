@@ -19,12 +19,23 @@ export const PROFILE = {
   email: "adrianzachary825@gmail.com",
   github: "https://github.com/JustZachary",
   linkedin: "https://www.linkedin.com/in/adrian-zachary-ian-2a4748181/",
-  resume: "/adrian_zachary_resume.pdf",
+  resume: "/adrian-zachary-cv.pdf",
   photo: "/my_picture.webp",
   /* The colour theme visitors see first: "sunset" or "holo" (people in dark mode get
      "night"). They can cycle themes with the round button in the top bar. The favicon
      files in src/app/ are drawn for Sunset. */
   theme: "sunset" as "sunset" | "holo" | "night",
+};
+
+/* The CV page (/cv) and the PDF made from it. The rest of the CV comes from the lists
+   below (experience, education, skills, awards) and from the projects file. */
+export const CV = {
+  summary:
+    "Software engineer and UKM Software Engineering (Information Systems) graduate, class of 2026. I build automation and AI tools for the Mlabs Group of companies: a government-tender crawler, a WhatsApp AI assistant, a single sign-in portal for four companies' internal apps and a social content engine. Before that, five months on enterprise PHP systems for the Sarawak state government at SAINS. Studying for AWS Solutions Architect – Associate.",
+  /* Shown on the CV page and PDF only, never on the portfolio page. Leave "" to hide. */
+  phone: "+60 13-286 0843",
+  website: "adrian-zachary-portfolio.vercel.app",
+  /* The PDF made from /cv. To go back to a hand-made CV, point PROFILE.resume at it. */
 };
 
 /* The 30-second version, top of the page. One line each. */

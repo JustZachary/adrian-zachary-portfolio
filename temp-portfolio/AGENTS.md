@@ -28,6 +28,14 @@ Do NOT write JSX for content. Everything shown comes from two files:
   facts, experience, education, awards, skills. Lines marked CHECK need confirming.
 - `src/data/projects.ts` — projects and Z Lab games (below).
 
+## The CV
+
+`/cv` (`src/app/cv/`) is the CV as a web page, built from the same data files, so it
+is never out of date. The downloadable PDF, `public/adrian-zachary-cv.pdf`, is printed
+from it: open `/cv` in Chrome, Print, Save as PDF (A4, no headers and footers), and
+replace that file. `CV` in `src/data/profile.ts` holds the summary and the phone
+number, which only the CV shows.
+
 ## Adding a project
 
 Append an object to `PROJECTS` in `src/data/projects.ts` and stop; it

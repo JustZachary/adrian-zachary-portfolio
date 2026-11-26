@@ -209,6 +209,7 @@ export default function Portfolio() {
     ...PROJECTS.map((p) => ({ group: "Projects", label: p.title, hint: p.kind + " · " + p.tech.join(" "), run: later(() => setProject(p)) })),
     ...GAMES.map((g) => ({ group: "Play", label: g.title, hint: g.tech + " · game", run: later(() => setGame(g)) })),
     { group: "Do", label: "Download my CV", hint: "resume pdf", run: later(() => { const a = document.createElement("a"); a.href = PROFILE.resume; a.download = ""; a.click(); }) },
+    { group: "Do", label: "Read my CV online", hint: "resume cv page", run: later(() => window.location.assign("/cv")) },
     { group: "Do", label: "Copy my email", hint: PROFILE.email, run: later(() => { navigator.clipboard?.writeText(PROFILE.email).catch(() => { location.href = "mailto:" + PROFILE.email; }); }) },
     { group: "Do", label: "Open LinkedIn", hint: "profile", run: later(() => window.open(PROFILE.linkedin, "_blank", "noopener")) },
     { group: "Do", label: "Open GitHub", hint: "code", run: later(() => window.open(PROFILE.github, "_blank", "noopener")) },
@@ -218,6 +219,7 @@ export default function Portfolio() {
 
   return (
     <div className={`pf theme-${theme}`}>
+      <a className="pf-skip" href="#work">Skip to my work</a>
       <TopBar seen={seen} current={current} theme={theme} progress={progress} onSearch={() => setPalette(true)} />
       <Hero reduce={reduce} live={live} />
       <Stats />
@@ -390,6 +392,7 @@ function Hero({ reduce, live }: { reduce: boolean; live: boolean }) {
           <p className="pf-links">
             <a href={PROFILE.linkedin} target="_blank" rel="noopener">LinkedIn ↗</a>
             <a href={PROFILE.github} target="_blank" rel="noopener">GitHub ↗</a>
+            <a href="/cv">CV as a web page</a>
           </p>
         </div>
         <div className="pf-hero-side" data-hero>

@@ -62,6 +62,10 @@ html[data-pf-theme="night"] .pf {
 .pf-links a { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; text-decoration-color: var(--pop); }
 .pf-links.light a { color: #FFF8EC; }
 
+/* skip link: the first thing keyboard users reach */
+.pf-skip { position: absolute; left: 12px; top: -60px; z-index: 200; background: var(--ink); color: var(--cream); padding: 10px 14px; border-radius: 8px; font: 600 14px var(--body); }
+.pf-skip:focus { top: 12px; }
+
 /* top bar */
 .pf-bar { position: sticky; top: 0; z-index: 40; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 2.5px solid var(--ink); }
 .pf-bar-in { display: flex; align-items: center; gap: 22px; height: 62px; }
@@ -462,7 +466,7 @@ html:not(.lenis) { scroll-behavior: smooth; }
   .pf-timeline::after { transform: none !important; }
   .pf-head { break-after: avoid; }
   .pf-uses, .pf-pal-dlg { display: none !important; }
-  a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 11px; color: #555; }
+  .pf a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 11px; color: #555; }
 }
 
 /* narrower screens */
