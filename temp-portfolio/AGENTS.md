@@ -31,7 +31,7 @@ Do NOT write JSX for content. Everything shown comes from two files:
 ## The CV
 
 `/cv` (`src/app/cv/`) is the CV as a web page, built from the same data files, so it
-is never out of date. The downloadable PDF, `public/adrian-zachary-cv.pdf`, is printed
+is never out of date. The downloadable PDF, `public/adrian_zachary_resume.pdf`, is printed
 from it: open `/cv` in Chrome, Print, Save as PDF (A4, no headers and footers), and
 replace that file. `CV` in `src/data/profile.ts` holds the summary and the phone
 number, which only the CV shows.

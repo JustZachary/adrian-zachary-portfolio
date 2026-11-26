@@ -19,7 +19,7 @@ export const PROFILE = {
   email: "adrianzachary825@gmail.com",
   github: "https://github.com/JustZachary",
   linkedin: "https://www.linkedin.com/in/adrian-zachary-ian-2a4748181/",
-  resume: "/adrian-zachary-cv.pdf",
+  resume: "/adrian_zachary_resume.pdf",
   photo: "/my_picture.webp",
   /* The colour theme visitors see first: "sunset" or "holo" (people in dark mode get
      "night"). They can cycle themes with the round button in the top bar. The favicon
@@ -35,7 +35,6 @@ export const CV = {
   /* Shown on the CV page and PDF only, never on the portfolio page. Leave "" to hide. */
   phone: "+60 13-286 0843",
   website: "adrian-zachary-portfolio.vercel.app",
-  /* The PDF made from /cv. To go back to a hand-made CV, point PROFILE.resume at it. */
 };
 
 /* The 30-second version, top of the page. One line each. */
