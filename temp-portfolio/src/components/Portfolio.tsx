@@ -11,7 +11,8 @@
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Lenis from "lenis";
-import { PROFILE, QUICK_FACTS, EXPERIENCE, EDUCATION, AWARDS, SKILLS, STATS } from "../data/profile";
+import { PROFILE, QUICK_FACTS, EXPERIENCE, EDUCATION, AWARDS, SKILLS, STATS, ABOUT } from "../data/profile";
+import LogoToy from "./LogoToy";
 import { PROJECTS, GAMES, ZLAB_URL } from "../data/projects";
 import type { Project, Game } from "../data/projects";
 import { PixelIcon } from "./icons";
@@ -223,6 +224,7 @@ export default function Portfolio() {
       <Work onOpen={setProject} />
       <Experience />
       <Skills onProject={setProject} onGame={setGame} />
+      <About theme={theme} />
       <Play onPlay={setGame} />
       <Contact />
       <footer className="pf-foot">
@@ -831,12 +833,30 @@ function Skills({ onProject, onGame }: { onProject: (p: Project) => void; onGame
   );
 }
 
+/* -------------------------------------------------------------- how I work */
+function About({ theme }: { theme: Theme }) {
+  return (
+    <section id="about" className="pf-sec pf-alt pf-about">
+      <div className="pf-wrap pf-about-in">
+        <div className="pf-about-copy">
+          <SecHead n="04" title="How I work" />
+          {ABOUT.paragraphs.map((t, i) => <p key={i} className="pf-about-p" data-reveal style={{ ["--i" as string]: i }}>{t}</p>)}
+          <ul className="pf-principles" data-reveal style={{ ["--i" as string]: 2 }}>
+            {ABOUT.principles.map((t, i) => <li key={t}><span className="pf-num">{String(i + 1).padStart(2, "0")}</span>{t}</li>)}
+          </ul>
+        </div>
+        <div data-reveal style={{ ["--i" as string]: 1 }}><LogoToy theme={theme} /></div>
+      </div>
+    </section>
+  );
+}
+
 /* --------------------------------------------------------------------- play */
 function Play({ onPlay }: { onPlay: (g: Game) => void }) {
   return (
     <section id="play" className="pf-sec pf-play">
       <div className="pf-wrap">
-        <SecHead n="04" title="After hours: games and 3D sites" sub="I make browser games and 3D sites in my own time, as Z Lab. Pick one; it opens right here." light />
+        <SecHead n="05" title="After hours: games and 3D sites" sub="I make browser games and 3D sites in my own time, as Z Lab. Pick one; it opens right here." light />
         <div className="pf-games">
           {GAMES.map((g, i) => (
             <button key={g.slug} type="button" className={"pf-game" + (i === 0 ? " feat" : "")} data-reveal style={{ ["--i" as string]: i % 4 }} onClick={() => onPlay(g)}>

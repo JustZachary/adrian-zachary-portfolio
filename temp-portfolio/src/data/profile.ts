@@ -36,6 +36,15 @@ export const QUICK_FACTS: { label: string; value: string }[] = [
   { label: "Studying", value: "AWS Solutions Architect – Associate" },
 ];
 
+/* "How I work": a few lines in your own words, beside the 3D logo. Rewrite freely. */
+export const ABOUT = {
+  paragraphs: [
+    "I like the problems a team runs into every day: checking a portal by hand, answering the same question for the tenth time, logging in to five different places. I build the small tool that makes that go away, then watch how people actually use it and fix what gets in their way.",
+    "After hours I make games and 3D sites, mostly to learn: Blender for the models, three.js and Web Audio in the browser. The logo here is one of them. Drag it, or smash it.",
+  ],
+  principles: ["Automate the boring part", "Ship small, then improve", "Make it fun to use", "Read the logs, not the guesses"],
+};
+
 /* The four numbers under the hero; they count up when they scroll into view. */
 export const STATS: { value: number; suffix?: string; label: string }[] = [
   { value: 4, label: "internal tools built at work" },
