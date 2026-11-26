@@ -24,7 +24,7 @@ export const PROFILE = {
 /* The 30-second version, top of the page. One line each. */
 export const QUICK_FACTS: { label: string; value: string }[] = [
   { label: "Now", value: "Automation & AI tools for the mlabs group of companies" },
-  { label: "Degree", value: "B.SE (Information Systems), UKM · Graduated Nov 2026 · Dean's List ×2" },
+  { label: "Degree", value: "B.SE (Information Systems), UKM 2026 · CGPA 3.31 · Dean's List ×2" },
   { label: "Internship", value: "Junior PHP Developer, SAINS · 5 months" },
   { label: "Stack", value: "TypeScript, React / Next.js, Node.js, PHP, SQL, Flutter" },
   { label: "Studying", value: "AWS Solutions Architect – Associate" },
@@ -72,7 +72,7 @@ export const EDUCATION = [
     school: "Universiti Kebangsaan Malaysia (UKM)",
     what: "Bachelor of Software Engineering (Information Systems) with Honours",
     when: "2022 – 2026",
-    detail: "Graduated 25 November 2026 · CGPA 3.25 · Dean's List Sem 2 2024/25 (GPA 3.89) and Sem 1 2025/26 (GPA 3.84)",
+    detail: "Graduated 25 November 2026 · CGPA 3.31 · Dean's List Sem 2 2024/25 (GPA 3.89) and Sem 1 2025/26 (GPA 3.84)",
   },
   {
     school: "Kolej Matrikulasi Selangor",
