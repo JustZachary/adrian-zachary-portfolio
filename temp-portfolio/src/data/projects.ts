@@ -1,7 +1,7 @@
 /* The work, as data.
  *
- * The desktop draws every project from this list: an icon in the projects
- * folder, and a window that opens when the icon is clicked. Adding a
+ * The page draws every project from this list as a card that opens into a
+ * case file (and the /desktop easter egg draws the same list as icons). Adding a
  * project is appending an object here; there is no layout code to touch.
  *
  *   icon   one of the pixel icons in src/components/icons.tsx
@@ -17,6 +17,8 @@ export type Project = {
   title: string;
   /* A short label shown on the window and in the folder status line. */
   kind: string;
+  /* Which filter it sits under on the page: built at work, or study and internship. */
+  area: "work" | "study";
   icon: IconName;
   tile: string;
   blurb: string;
@@ -37,6 +39,7 @@ export const PROJECTS: Project[] = [
     slug: "tender-watch",
     title: "Tender Watch",
     kind: "Automation",
+    area: "work",
     icon: "tower",
     tile: "#FFC93C",
     blurb: "A crawler that reads government tender listings every weekday and posts new matches to a shared team board.",
@@ -53,6 +56,7 @@ export const PROJECTS: Project[] = [
     slug: "sales-desk",
     title: "WhatsApp AI sales desk",
     kind: "AI",
+    area: "work",
     icon: "chat",
     tile: "#3DD6A3",
     blurb: "An assistant that answers customers on WhatsApp from the company's own pages, short and polite, in Malay or English.",
@@ -69,6 +73,7 @@ export const PROJECTS: Project[] = [
     slug: "worker-portal",
     title: "Worker portal",
     kind: "Internal tool",
+    area: "work",
     icon: "door",
     tile: "#E9E3FF",
     blurb: "One sign-in in front of four companies' internal apps, with roles that decide which workspaces each person sees.",
@@ -85,6 +90,7 @@ export const PROJECTS: Project[] = [
     slug: "post-engine",
     title: "Post Engine",
     kind: "Content",
+    area: "work",
     icon: "post",
     tile: "#FF5A36",
     blurb: "One idea in, ready posts out for Instagram, Facebook, TikTok and Threads, with written captions, pictures and short video.",
@@ -100,6 +106,7 @@ export const PROJECTS: Project[] = [
     slug: "smartairiq",
     title: "SmartAirIQ",
     kind: "Final year project",
+    area: "study",
     icon: "phone",
     tile: "#BFEFFF",
     blurb: "A mobile app for real-time air quality, weather and simple precautions, shown on a map.",
@@ -123,6 +130,7 @@ export const PROJECTS: Project[] = [
     slug: "ai-recruitment",
     title: "AI recruitment system",
     kind: "Internship · SAINS",
+    area: "study",
     icon: "resume",
     tile: "#FBF1DA",
     blurb: "An enterprise recruitment platform with AI resume analysis and interview question generation.",

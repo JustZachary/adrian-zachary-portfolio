@@ -18,7 +18,8 @@
 }
 
 html, body { margin: 0; height: 100%; }
-body { background: #2C2F6B; color: var(--ink); font-family: var(--pixel); }
+body { background: #FFF8EC; color: var(--ink); font-family: var(--body); }
+.screen, .phone { font-family: var(--pixel); }
 a { color: var(--ink); }
 a:hover { color: var(--tomato); }
 button { font: inherit; color: inherit; cursor: pointer; }

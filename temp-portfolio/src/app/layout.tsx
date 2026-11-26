@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./portfolio.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://adrian-zachary-portfolio.vercel.app"),
   title: "Adrian Zachary · Software Engineer",
   description:
-    "Software engineer in Petaling Jaya. Automation and AI tools by day, playable browser games by night. Projects, Z Lab games and contact, on a little retro desktop.",
+    "Software engineer in Petaling Jaya. Automation and AI tools at work, browser games after hours. Projects, experience, skills, CV and contact on one page.",
   openGraph: {
     title: "Adrian Zachary · Software Engineer",
     description: "Automation and AI tools by day, playable browser games by night.",
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport: Viewport = { themeColor: "#2C2F6B" };
+export const viewport: Viewport = { themeColor: "#FFF8EC" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

@@ -7,6 +7,7 @@
  * Everything shown comes from src/data/projects.ts.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { PROJECTS, GAMES, ZLAB_URL } from "../data/projects";
 import type { Project, Game, IconName } from "../data/projects";
 import { PixelIcon } from "./icons";
@@ -239,6 +240,7 @@ export default function Desktop() {
             <a role="menuitem" href={RESUME} target="_blank" rel="noopener">Résumé (PDF)</a>
             <a role="menuitem" href={GITHUB} target="_blank" rel="noopener">GitHub</a>
             <a role="menuitem" href={LINKEDIN} target="_blank" rel="noopener">LinkedIn</a>
+            <Link role="menuitem" href="/">Simple view</Link>
           </div>
         )}
       </footer>

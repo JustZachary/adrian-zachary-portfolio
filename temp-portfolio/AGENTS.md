@@ -6,22 +6,38 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # This site
 
-The app lives in `temp-portfolio/`. The page is a little retro computer,
-"AZ-OS": `src/components/Desktop.tsx` draws the desktop, its icons, the
-windows (drag, focus, minimise, close), the taskbar and start menu, and on
-phones the same windows stacked in one column. `src/app/page.tsx` only
-mounts it.
+The app lives in `temp-portfolio/`. The home page is one scroll, written so a
+recruiter gets the picture in thirty seconds: name, quick facts and the CV
+button, then Work, Experience & education, Skills, Play (the Z Lab games,
+playable in a window), Contact. `src/components/Portfolio.tsx` draws it and
+`src/app/portfolio.css` styles it (every class starts with `pf-`).
+
+The fun parts never hide content: the photo un-pixelates, the quick facts
+type in, the top bar fills a coin per section seen (confetti at 100%), cards
+tilt, games open in a window. They all switch off for reduced motion.
+
+The old retro desktop, "AZ-OS", lives on at `/desktop` as an easter egg
+(`src/components/Desktop.tsx`, styles in `globals.css`), linked from the
+footer.
+
+## Changing the words
+
+Do NOT write JSX for content. Everything shown comes from two files:
+
+- `src/data/profile.ts` — name, intro line, availability badge, links, quick
+  facts, experience, education, awards, skills. Lines marked CHECK need confirming.
+- `src/data/projects.ts` — projects and Z Lab games (below).
 
 ## Adding a project
 
-Do NOT write JSX for it. Append an object to `PROJECTS` in
-`src/data/projects.ts` and stop; it appears as an icon in the projects
-folder and opens in its own window, drawn the same way as the others.
+Append an object to `PROJECTS` in `src/data/projects.ts` and stop; it
+appears as a card that opens into a case file, and as an icon on `/desktop`.
 
 The type in that file is the contract. In short:
 
-- `slug` — unique; the window is titled `<slug>.txt`
+- `slug` — unique
 - `title` / `kind` / `blurb` — the name, a short label, one sentence
+- `area` — `"work"` or `"study"`, which filter it sits under
 - `icon` / `tile` — a pixel icon from `src/components/icons.tsx` and the colour behind it
 - `notes` — Problem / Solution / My Contribution / Outcome, in that order
 - `tech` — short names, the things a reader would recognise
@@ -29,18 +45,18 @@ The type in that file is the contract. In short:
 - `caseStudy` — optional extra headed notes
 
 A Z Lab game is an entry in `GAMES` in the same file (its thumbnail in
-`public/`); it plays inside the desktop in an iframe from the Z Lab site.
+`public/`); it plays in a window in an iframe from the Z Lab site.
 
 Images go in `public/` and are referenced by filename alone, no leading
 slash.
 
 ## What not to touch without being asked
 
-The colour variables and the pixel look in `globals.css` are the design.
-Changing spacing or type there to make a new project fit is the wrong end
-of the problem — change the data.
+The colour variables in `globals.css` are the design, shared by both pages.
+Changing spacing or type to make a new project fit is the wrong end of the
+problem — change the data.
 
 ## Checking the work
 
-`npm run dev` and look at it, on a laptop width and a phone width. There
-are no tests here; the check is the page.
+`npm run dev` and look at it, on a laptop width and a phone width, at `/`
+and `/desktop`. There are no tests here; the check is the page.
