@@ -8,7 +8,7 @@ import "./cv.css";
    one A4 column that prints cleanly. Built from the same data as the portfolio, so
    it is never out of date. The PDF in public/ is printed from this page. */
 export const metadata: Metadata = {
-  title: "CV · Adrian Zachary",
+  title: "CV · Adrian Zachary bin Ian",
   description: "Adrian Zachary, software engineer in Petaling Jaya: experience, projects, skills and education.",
 };
 
@@ -34,7 +34,7 @@ export default function CvPage() {
       <article className="cv">
         <header className="cv-head">
           <div>
-            <h1>{PROFILE.name}</h1>
+            <h1>{CV.fullName}</h1>
             <p className="cv-role">{PROFILE.role} · {PROFILE.location}</p>
           </div>
           <ul className="cv-contact">
@@ -46,7 +46,18 @@ export default function CvPage() {
           </ul>
         </header>
 
-        <section><h2>Summary</h2><p>{CV.summary}</p></section>
+        <section><h2>Summary</h2><p className="cv-summary">{CV.summary}</p></section>
+
+        <section>
+          <h2>Education</h2>
+          {EDUCATION.map((e) => (
+            <div key={e.school} className="cv-item">
+              <div className="cv-line"><h3>{e.what}</h3><span>{e.when}</span></div>
+              <p className="cv-sub">{e.school}</p>
+              <p>{e.detail}</p>
+            </div>
+          ))}
+        </section>
 
         <section>
           <h2>Experience</h2>
@@ -86,17 +97,6 @@ export default function CvPage() {
         <section>
           <h2>Languages</h2>
           <p className="cv-langs">{CV.languages.map((l) => <span key={l.name}><b>{l.name}</b> {l.level}</span>)}</p>
-        </section>
-
-        <section>
-          <h2>Education</h2>
-          {EDUCATION.map((e) => (
-            <div key={e.school} className="cv-item">
-              <div className="cv-line"><h3>{e.what}</h3><span>{e.when}</span></div>
-              <p className="cv-sub">{e.school}</p>
-              <p>{e.detail}</p>
-            </div>
-          ))}
         </section>
 
         <section>

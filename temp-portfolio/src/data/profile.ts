@@ -30,8 +30,11 @@ export const PROFILE = {
 /* The CV page (/cv) and the PDF made from it. The rest of the CV comes from the lists
    below (experience, education, skills, awards) and from the projects file. */
 export const CV = {
+  /* Full name as it appears on the CV (the site itself goes by Zach). */
+  fullName: "Adrian Zachary bin Ian",
+  /* Kept high-level: no client names, internal systems or anything private and confidential. */
   summary:
-    "Software engineer and UKM Software Engineering (Information Systems) graduate, class of 2026. I build automation and AI tools for the Mlabs Group of companies: a government-tender crawler, a WhatsApp AI assistant, a single sign-in portal for four companies' internal apps and a social content engine. Before that, five months on enterprise PHP systems for the Sarawak state government at SAINS. Studying for AWS Solutions Architect – Associate.",
+    "Software engineer and UKM Software Engineering (Information Systems) graduate, class of 2026. At the Mlabs Group I build automation, AI tools, internal platforms and websites: a government-tender tracker, a WhatsApp AI sales assistant, a content tool that turns one idea into posts for every social platform, a single sign-in portal and renewal reminders for staff, and websites for group companies, including a 3D venue walkthrough. Before that, five months on enterprise PHP systems for the Sarawak state government at SAINS. Studying for AWS Solutions Architect – Associate.",
   /* Shown on the CV page and PDF only, never on the portfolio page. Leave "" to hide. */
   phone: "+60 13-286 0843",
   website: "adrian-zachary-portfolio.vercel.app",

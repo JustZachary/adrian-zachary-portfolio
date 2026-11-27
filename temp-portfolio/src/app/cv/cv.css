@@ -30,6 +30,7 @@
 .cv-sub { color: var(--accent); font-weight: 600; font-size: 10pt; }
 .cv-tech { margin-top: 2px !important; font-size: 9.2pt; color: var(--muted); font-style: italic; }
 .cv-proj { margin-top: 7px; }
+.cv-summary { text-wrap: pretty; }
 .cv-item h3 + span, .cv-line { break-after: avoid; }
 .cv-psi { margin: 2px 0 0; display: grid; gap: 1px; }
 .cv-psi div { display: grid; grid-template-columns: 17mm minmax(0, 1fr); gap: 8px; }
