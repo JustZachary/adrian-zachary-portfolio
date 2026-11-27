@@ -1,36 +1,51 @@
-/* The CV page: one A4 column, quiet type, prints cleanly. Brand touches are the pixel
-   face for the name and the navy and coral of the Sunset theme. */
-.cv-page { --ink: #1B1F4B; --muted: #5F5A78; --accent: #B8322B; --line: #E7D9CF; min-height: 100vh; background: #F3EEE8; padding: 24px 16px 56px; font-family: var(--body); color: var(--ink); }
-.cv-actions { max-width: 210mm; margin: 0 auto 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font: 600 14px var(--body); }
+/* The CV page: one A4 column, formal type, prints cleanly.
+   Source Serif 4 for the name and section headings, Source Sans 3 for everything else, in ink and deep navy. */
+.cv-page { --ink: #161B2E; --muted: #555D70; --accent: #23395D; --line: #D8DDE6; --cv-serif: "Source Serif 4", Georgia, "Times New Roman", serif; --cv-sans: "Source Sans 3", "Helvetica Neue", Arial, sans-serif;
+  min-height: 100vh; background: #EEF0F3; padding: 24px 16px 56px; font-family: var(--cv-sans); color: var(--ink); }
+.cv-actions { max-width: 210mm; margin: 0 auto 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font: 600 14px var(--cv-sans); }
 .cv-actions a { color: var(--ink); }
 .cv-actions span { display: flex; gap: 10px; }
-.cv-btn { font: 600 14px var(--body); padding: 8px 14px; border: 2px solid var(--ink); border-radius: 999px; background: #fff; color: var(--ink); text-decoration: none; cursor: pointer; box-shadow: 2px 2px 0 var(--ink); }
-.cv { max-width: 210mm; margin: 0 auto; background: #fff; padding: 16mm 16mm 14mm; box-shadow: 0 10px 40px rgba(27, 31, 75, .12); border-radius: 4px; font-size: 10.4pt; line-height: 1.5; }
+.cv-btn { font: 600 14px var(--cv-sans); padding: 8px 16px; border: 1.5px solid var(--ink); border-radius: 6px; background: #fff; color: var(--ink); text-decoration: none; cursor: pointer; }
+.cv-btn:hover { background: var(--ink); color: #fff; }
+.cv { max-width: 210mm; margin: 0 auto; background: #fff; padding: 17mm 17mm 15mm; box-shadow: 0 10px 40px rgba(22, 27, 46, .10); border-radius: 3px; font-size: 10.8pt; line-height: 1.45; font-feature-settings: 'kern' 1, 'liga' 1; }
 .cv a { color: inherit; }
-.cv-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 3px solid var(--ink); }
-.cv h1 { margin: 0; font: 600 26pt/1 var(--pixel); letter-spacing: .01em; }
-.cv-role { margin: 6px 0 0; color: var(--accent); font-weight: 600; }
-.cv-contact { list-style: none; margin: 0; padding: 0; text-align: right; font-size: 9.2pt; color: var(--muted); }
+.cv-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 1.5px solid var(--ink); }
+.cv h1 { margin: 0; font: 600 27pt/1.05 var(--cv-serif); letter-spacing: -.005em; color: var(--ink); }
+.cv-role { margin: 6px 0 0; color: var(--accent); font-weight: 600; font-size: 11pt; letter-spacing: .01em; }
+.cv-contact { list-style: none; margin: 0; padding: 0; text-align: right; font-size: 9.6pt; line-height: 1.5; color: var(--muted); }
 .cv-contact a { text-decoration: none; }
-.cv section { margin-top: 14px; }
-.cv h2 { margin: 0 0 6px; font: 600 10pt var(--pixel); text-transform: uppercase; letter-spacing: .12em; color: var(--accent); border-bottom: 1.5px solid var(--line); padding-bottom: 3px; }
-.cv h3 { margin: 0; font-size: 10.6pt; }
+.cv section { margin-top: 15px; }
+.cv h2 { break-after: avoid; }
+.cv section:has(.cv-skills), .cv section:has(.cv-langs) { break-inside: avoid; } /* never strand a heading at the foot of a page */
+.cv h2 { margin: 0 0 7px; font: 600 11pt var(--cv-serif); text-transform: uppercase; letter-spacing: .14em; color: var(--accent); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.cv h3 { margin: 0; font-size: 11pt; font-weight: 600; }
 .cv p { margin: 0; }
-.cv ul { margin: 3px 0 0; padding-left: 16px; }
+.cv ul { margin: 3px 0 0; padding-left: 15px; }
+.cv ul:not(.cv-contact) { list-style: disc; }
+.cv li::marker { color: var(--muted); }
 .cv li { margin: 1px 0; }
 .cv-item { margin-top: 9px; break-inside: avoid; }
 .cv-line { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
-.cv-line span { font-size: 9.2pt; color: var(--muted); white-space: nowrap; }
-.cv-sub { color: var(--muted); font-weight: 600; font-size: 9.6pt; }
-.cv-tech { margin-top: 2px !important; font-size: 8.8pt; color: var(--muted); }
+.cv-line span { font-size: 9.6pt; color: var(--muted); white-space: nowrap; font-variant-numeric: lining-nums; }
+.cv-sub { color: var(--accent); font-weight: 600; font-size: 10pt; }
+.cv-tech { margin-top: 2px !important; font-size: 9.2pt; color: var(--muted); font-style: italic; }
 .cv-proj { margin-top: 7px; }
-.cv-proj p { font-size: 9.8pt; }
+.cv-item h3 + span, .cv-line { break-after: avoid; }
+.cv-psi { margin: 2px 0 0; display: grid; gap: 1px; }
+.cv-psi div { display: grid; grid-template-columns: 17mm minmax(0, 1fr); gap: 8px; }
+.cv-psi dt { padding-top: .18em; font-size: 8.2pt; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--accent); }
+.cv-psi dd { margin: 0; }
+.cv-langs { display: flex; flex-wrap: wrap; gap: 4px 28px; }
+.cv-langs b { font-weight: 600; margin-right: 6px; }
+
+.cv-proj p { font-size: 10.4pt; }
 .cv-skills { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; }
 .cv-skills div { display: flex; gap: 8px; }
-.cv-skills dt { font-weight: 700; min-width: 30mm; }
+.cv-skills dt { font-weight: 600; min-width: 30mm; }
 .cv-skills dd { margin: 0; }
-.cv-foot { margin-top: 14px !important; font-size: 9pt; color: var(--muted); }
+.cv-foot { margin-top: 14px !important; font-size: 9.4pt; color: var(--muted); font-style: italic; }
 @media (max-width: 640px) {
+  .cv-psi div { grid-template-columns: 1fr; gap: 0; }
   .cv { padding: 22px 18px; font-size: 10pt; }
   .cv-contact { text-align: left; }
   .cv-skills { grid-template-columns: 1fr; }
@@ -41,5 +56,6 @@
   html, body { background: #fff !important; }
   .cv-page { background: #fff; padding: 0; min-height: 0; }
   .cv-actions { display: none; }
-  .cv { max-width: none; padding: 0; box-shadow: none; font-size: 9.8pt; }
+  .cv { max-width: none; padding: 0; box-shadow: none; font-size: 9.9pt; line-height: 1.4; }
+  .cv section { margin-top: 12px; }
 }

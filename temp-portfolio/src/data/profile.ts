@@ -35,6 +35,20 @@ export const CV = {
   /* Shown on the CV page and PDF only, never on the portfolio page. Leave "" to hide. */
   phone: "+60 13-286 0843",
   website: "adrian-zachary-portfolio.vercel.app",
+  /* The three projects the CV tells as problem → solution → impact (slugs from projects.ts, plus Z Lab). */
+  projects: ["tender-watch", "sales-desk"] as string[],
+  zlab: {
+    problem: "Clients find it hard to picture what an interactive website could do for them before they commit.",
+    solution: "Built Z Lab in my own time: browser games and interactive 3D sites using Blender models, three.js, Canvas and Web Audio.",
+    impact: "38 games and sites live and playable, used as a showcase for client work.",
+    tech: ["Blender", "three.js", "Canvas", "Web Audio", "Vercel"],
+  },
+  /* Spoken languages, CV only. */
+  languages: [
+    { name: "Bahasa Malaysia", level: "Fluent" },
+    { name: "English", level: "Fluent" },
+    { name: "Chinese", level: "Beginner" },
+  ],
 };
 
 /* The 30-second version, top of the page. One line each. */
@@ -63,7 +77,7 @@ export const STATS: { value: number; suffix?: string; label: string }[] = [
   { value: 5, label: "months on government systems at SAINS" },
 ];
 
-export type Job = { role: string; org: string; place: string; when: string; points: string[]; tech?: string[] };
+export type Job = { role: string; org: string; place: string; when: string; points: string[]; cvPoints?: string[]; tech?: string[]; cv?: false };
 
 export const EXPERIENCE: Job[] = [
   {
@@ -74,6 +88,11 @@ export const EXPERIENCE: Job[] = [
     points: [
       "Built a crawler that checks government tender listings every weekday and posts new matches to the team.",
       "Built a WhatsApp AI assistant that answers customers from the company's own pages, in Malay or English.",
+      "Built and deployed one sign-in portal in front of four companies' internal apps, with roles per workspace.",
+      "Built Post Engine: one idea in, ready posts out for four social platforms, with images and short video.",
+    ],
+    cvPoints: [ // the CV's shorter version: Tender Watch and the WhatsApp desk get their own Projects entries
+      "Build and run the group's automation and AI tools, including a daily government-tender crawler and a WhatsApp AI assistant for customers (see Projects).",
       "Built and deployed one sign-in portal in front of four companies' internal apps, with roles per workspace.",
       "Built Post Engine: one idea in, ready posts out for four social platforms, with images and short video.",
     ],
@@ -97,6 +116,7 @@ export const EXPERIENCE: Job[] = [
     place: "Bangi",
     when: "Mar 2024 – Apr 2025",
     points: ["Ran POS and tournament logistics alongside full-time study."],
+    cv: false, // shown on the website, left off the CV
   },
 ];
 

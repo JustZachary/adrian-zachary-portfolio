@@ -14,6 +14,19 @@ export const metadata: Metadata = {
 
 const host = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
 
+// Problem, solution and impact, from the project's own notes ("Outcome" is shown as Impact).
+const note = (slug: string, t: string) => PROJECTS.find((x) => x.slug === slug)?.notes.find((n) => n.title === t)?.body;
+function PSI({ c }: { c: { problem?: string; solution?: string; impact?: string } }) {
+  return (
+    <dl className="cv-psi">
+      {c.problem && <div><dt>Problem</dt><dd>{c.problem}</dd></div>}
+      {c.solution && <div><dt>Solution</dt><dd>{c.solution}</dd></div>}
+      {c.impact && <div><dt>Impact</dt><dd>{c.impact}</dd></div>}
+    </dl>
+  );
+}
+const CV_PROJECTS = CV.projects.map((slug) => PROJECTS.find((p) => p.slug === slug)).filter((p) => p !== undefined);
+
 export default function CvPage() {
   return (
     <div className="cv-page">
@@ -37,11 +50,11 @@ export default function CvPage() {
 
         <section>
           <h2>Experience</h2>
-          {EXPERIENCE.map((j) => (
+          {EXPERIENCE.filter((j) => j.cv !== false).map((j) => (
             <div key={j.org + j.role} className="cv-item">
               <div className="cv-line"><h3>{j.role}</h3><span>{j.when}</span></div>
               <p className="cv-sub">{j.org} · {j.place}</p>
-              <ul>{j.points.map((p) => <li key={p}>{p}</li>)}</ul>
+              <ul>{(j.cvPoints ?? j.points).map((p) => <li key={p}>{p}</li>)}</ul>
               {j.tech && <p className="cv-tech">{j.tech.join(" · ")}</p>}
             </div>
           ))}
@@ -49,24 +62,30 @@ export default function CvPage() {
 
         <section>
           <h2>Projects</h2>
-          {PROJECTS.map((p) => (
+          {CV_PROJECTS.map((p) => (
             <div key={p.slug} className="cv-item cv-proj">
               <div className="cv-line"><h3>{p.title}</h3><span>{p.kind}</span></div>
-              <p>{p.blurb} {p.notes.find((n) => n.title === "Outcome")?.body}</p>
+              <PSI c={{ problem: note(p.slug, "Problem"), solution: note(p.slug, "Solution"), impact: note(p.slug, "Outcome") }} />
               <p className="cv-tech">{p.tech.join(" · ")}</p>
             </div>
           ))}
           <div className="cv-item cv-proj">
-            <div className="cv-line"><h3>Z Lab</h3><span>Personal</span></div>
-            <p>Browser games and interactive 3D sites built in my own time: Blender models, three.js, Canvas and Web Audio. Playable at <a href={ZLAB_URL}>{host(ZLAB_URL)}</a>.</p>
+            <div className="cv-line"><h3>Z Lab</h3><span>Personal · <a href={ZLAB_URL}>{host(ZLAB_URL)}</a></span></div>
+            <PSI c={CV.zlab} />
+            <p className="cv-tech">{CV.zlab.tech.join(" · ")}</p>
           </div>
         </section>
 
         <section>
           <h2>Skills</h2>
           <dl className="cv-skills">
-            {SKILLS.map((g) => <div key={g.group}><dt>{g.group}</dt><dd>{g.items.join(", ")}</dd></div>)}
+            {SKILLS.map((g) => <div key={g.group}><dt>{g.group === "Languages" ? "Programming" : g.group}</dt><dd>{g.items.join(", ")}</dd></div>)}
           </dl>
+        </section>
+
+        <section>
+          <h2>Languages</h2>
+          <p className="cv-langs">{CV.languages.map((l) => <span key={l.name}><b>{l.name}</b> {l.level}</span>)}</p>
         </section>
 
         <section>

@@ -35,6 +35,8 @@ is never out of date. The downloadable PDF, `public/adrian_zachary_resume.pdf`, 
 from it: open `/cv` in Chrome, Print, Save as PDF (A4, no headers and footers), and
 replace that file. `CV` in `src/data/profile.ts` holds the summary and the phone
 number, which only the CV shows.
+The CV is set in Source Serif 4 (name, section headings) and Source Sans 3 (everything else),
+loaded with the other Google Fonts in `src/app/layout.tsx`; it deliberately doesn't use the site's pixel face.
 
 ## Achievements
 
